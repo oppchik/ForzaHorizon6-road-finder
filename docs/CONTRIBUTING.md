@@ -5,7 +5,7 @@ Thanks for wanting to help! Here's how to get started.
 ## Setup
 
 ```bash
-git clone https://github.com/your-username/forza-road-finder
+git clone https://github.com/oppchik/forza-road-finder
 cd forza-road-finder
 
 # Frontend
