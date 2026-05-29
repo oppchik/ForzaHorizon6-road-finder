@@ -1,0 +1,26 @@
+# Node
+node_modules/
+.next/
+.vercel/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Debug images from calibration
+debug_mask.png
