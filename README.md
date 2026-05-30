@@ -1,4 +1,4 @@
-# 🏎️ Forza Road Finder
+# 🏎️ Forza Horizon 6 Road Finder
 
 > Open-source tool for Forza Horizon 6 players to find unexplored roads on the map using computer vision.
 
