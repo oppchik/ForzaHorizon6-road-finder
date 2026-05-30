@@ -21,12 +21,12 @@ Getting 100% road exploration in Forza Horizon requires driving every road on th
 ## Architecture
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Next.js App   │────▶│  Next.js API     │────▶│  CV Service     │
-│   (Vercel)      │     │  Routes          │     │  (Python/FastAPI│
-│                 │◀────│  - /api/xbox     │◀────│  + OpenCV)      │
-│  Mobile-first   │     │  - /api/analyze  │     │                 │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
+┌─────────────────┐      ┌─────────────────┐     ┌─────────────────┐
+│   Next.js App   │────> │ Next.js API     │────>│  CV Service     │
+│   (Vercel)      │      │  Routes         │     │  (Python/FastAPI│
+│                 │<──── │  - /api/xbox    │<────│  + OpenCV)      │
+│  Mobile-first   │      │  - /api/analyze │     │                 │
+└─────────────────┘      └─────────────────┘     └─────────────────┘
                                 │
                                 ▼
                         ┌──────────────────┐
