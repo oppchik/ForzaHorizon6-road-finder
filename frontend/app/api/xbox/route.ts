@@ -44,12 +44,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     console.log("[xbox] /profile/gamertag status:", res1.status, "body:", JSON.stringify(body1).slice(0, 300));
 
     if (res1.ok) {
+      const env1 = body1?.content ?? body1;
       profileData =
-        (body1?.profileUsers as unknown[])?.[0] as Record<string, unknown> ??
-        (body1?.people as unknown[])?.[0] as Record<string, unknown> ??
+        (env1?.profileUsers as unknown[])?.[0] as Record<string, unknown> ??
+        (env1?.people as unknown[])?.[0] as Record<string, unknown> ??
         null;
     }
-
     if (!profileData) {
       const url2 = `${OPENXBL_BASE}/friends/search?gt=${encodeURIComponent(gamertag)}`;
       console.log("[xbox] Trying:", url2);
@@ -62,13 +62,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       console.log("[xbox] /friends/search status:", res2.status, "body:", JSON.stringify(body2).slice(0, 300));
 
       if (res2.ok) {
+        const env2 = body2?.content ?? body2;
         profileData =
-          (body2?.profileUsers as unknown[])?.[0] as Record<string, unknown> ??
-          (body2?.people as unknown[])?.[0] as Record<string, unknown> ??
+          (env2?.profileUsers as unknown[])?.[0] as Record<string, unknown> ??
+          (env2?.people as unknown[])?.[0] as Record<string, unknown> ??
           null;
       }
     }
-
     if (!profileData) {
       const url3 = `${OPENXBL_BASE}/people/search?q=${encodeURIComponent(gamertag)}`;
       console.log("[xbox] Trying:", url3);
@@ -81,9 +81,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       console.log("[xbox] /people/search status:", res3.status, "body:", JSON.stringify(body3).slice(0, 300));
 
       if (res3.ok) {
+        const env3 = body3?.content ?? body3;
         profileData =
-          (body3?.people as unknown[])?.[0] as Record<string, unknown> ??
-          (body3?.profileUsers as unknown[])?.[0] as Record<string, unknown> ??
+          (env3?.people as unknown[])?.[0] as Record<string, unknown> ??
+          (env3?.profileUsers as unknown[])?.[0] as Record<string, unknown> ??
           null;
       }
     }
@@ -94,12 +95,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
 
     console.log("[xbox] profileData keys:", Object.keys(profileData));
-
     const settings: Record<string, string> = {};
     for (const s of (profileData.settings as { id: string; value: string }[]) ?? []) {
       settings[s.id] = s.value;
     }
-
     const profile = {
       gamertag: settings["Gamertag"] ?? (profileData.gamertag as string) ?? gamertag,
       gamerscore: parseInt(settings["Gamerscore"] ?? String(profileData.gamerscore ?? "0"), 10),
