@@ -6,6 +6,37 @@ const FH6_TITLE_ID = "2144864829";
 const ROAD_EXPLORER_ACHIEVEMENT_ID = "1";
 const OPENXBL_BASE = "https://xbl.io/api/v2";
 
+interface CacheEntry {
+  data: XboxProfileResponse;
+  expiresAt: number;
+}
+const profileCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 минут
+
+function getCached(gamertag: string): XboxProfileResponse | null {
+  const entry = profileCache.get(gamertag.toLowerCase());
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    profileCache.delete(gamertag.toLowerCase());
+    return null;
+  }
+  return entry.data;
+}
+
+function setCache(gamertag: string, data: XboxProfileResponse): void {
+  profileCache.set(gamertag.toLowerCase(), {
+    data,
+    expiresAt: Date.now() + CACHE_TTL_MS,
+  });
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of profileCache.entries()) {
+    if (now > entry.expiresAt) profileCache.delete(key);
+  }
+}, 60_000);
+
 function openxblHeaders() {
   const key = process.env.OPENXBL_API_KEY;
   if (!key) throw new Error("OPENXBL_API_KEY is not configured");
@@ -32,6 +63,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    const cached = getCached(gamertag);
+    if (cached) {
+      console.log("[xbox] Cache hit for:", gamertag);
+      return NextResponse.json(cached, {
+        headers: {
+          ...getCorsHeaders(origin),
+          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+          "X-Cache": "HIT",
+        },
+      });
+    }
+
     let profileData: Record<string, unknown> | null = null;
     const url1 = `${OPENXBL_BASE}/profile/gamertag/${encodeURIComponent(gamertag)}`;
     console.log("[xbox] Trying:", url1);
@@ -140,6 +183,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
 
     const response: XboxProfileResponse = { success: true, profile, forzaAchievement };
+
+    setCache(gamertag, response);
 
     return NextResponse.json(response, {
       headers: {
