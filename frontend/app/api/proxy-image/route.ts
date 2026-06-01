@@ -16,12 +16,11 @@ const ALLOWED_HOSTS = [
   "xbox.com",               
 ];
 
-const MAX_BYTES = 15 * 1024 * 1024; // 15 MB
+const MAX_BYTES = 15 * 1024 * 1024; 
 
 function isAllowedUrl(raw: string): boolean {
   try {
     const parsed = new URL(raw);
-    
     if (parsed.protocol !== "https:") return false;
     return ALLOWED_HOSTS.some(
       (host) => parsed.hostname === host || parsed.hostname.endsWith("." + host)
@@ -62,10 +61,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     });
 
     if (!upstream.ok) {
+      console.log("[proxy-image] CDN error:", upstream.status, upstream.statusText, "url:", decodedUrl.slice(0, 100));
       return errorResponse(`CDN returned ${upstream.status}`, 502);
     }
 
     const contentType = upstream.headers.get("content-type") ?? "";
+    console.log("[proxy-image] CDN ok, content-type:", contentType, "size:", upstream.headers.get("content-length"));
     if (!contentType.startsWith("image/")) {
       return errorResponse("Remote resource is not an image.", 422);
     }
