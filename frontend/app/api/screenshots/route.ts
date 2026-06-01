@@ -51,8 +51,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     if (res1.ok) {
       const data = await res1.json();
+      console.log("[screenshots] dvr raw keys:", Object.keys(data));
       const items = (data?.screenshots ?? data?.content?.screenshots ?? []) as RawScreenshot[];
+      console.log("[screenshots] dvr items count:", items.length);
+      if (items[0]) console.log("[screenshots] first item keys:", Object.keys(items[0]));
+      if (items[0]) console.log("[screenshots] first item sample:", JSON.stringify(items[0]).slice(0, 500));
       screenshots = parseScreenshots(items);
+      console.log("[screenshots] parsed count:", screenshots.length);
+      if (screenshots[0]) console.log("[screenshots] first parsed thumbnailUrl:", screenshots[0].thumbnailUrl);
     }
     if (screenshots.length === 0) {
       const res2 = await fetch(
@@ -69,7 +75,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         screenshots = parseScreenshots(items);
       }
     }
-
     const result = screenshots.slice(0, MAX_SCREENSHOTS);
 
     return NextResponse.json(
@@ -125,6 +130,7 @@ function parseScreenshots(items: RawScreenshot[]): ScreenshotItem[] {
     try {
       const id = item.screenshotId ?? item.contentId ?? "";
       if (!id) continue;
+
       const thumb =
         item.thumbnails?.find((t) => t.thumbnailType === "Small")?.uri ??
         item.thumbnails?.[0]?.uri ??
