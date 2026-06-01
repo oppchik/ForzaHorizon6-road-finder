@@ -74,74 +74,47 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         },
       });
     }
-
     let profileData: Record<string, unknown> | null = null;
-    const url1 = `${OPENXBL_BASE}/profile/gamertag/${encodeURIComponent(gamertag)}`;
-    console.log("[xbox] Trying:", url1);
-    const res1 = await fetch(url1, {
+
+    const url = `${OPENXBL_BASE}/friends/search?gt=${encodeURIComponent(gamertag)}`;
+    console.log("[xbox] Fetching:", url);
+    const res = await fetch(url, {
       headers: openxblHeaders(),
       signal: AbortSignal.timeout(6000),
     });
 
-    const body1 = await res1.json();
-    console.log("[xbox] /profile/gamertag status:", res1.status, "body:", JSON.stringify(body1).slice(0, 300));
+    const body = await res.json();
+    console.log("[xbox] status:", res.status, "body:", JSON.stringify(body).slice(0, 300));
 
-    if (res1.ok) {
-      const env1 = body1?.content ?? body1;
-      profileData =
-        (env1?.profileUsers as unknown[])?.[0] as Record<string, unknown> ??
-        (env1?.people as unknown[])?.[0] as Record<string, unknown> ??
-        null;
+    if (body?.code === 429) {
+      return errorResponse("Xbox API rate limit reached. Please wait a few minutes and try again.", 429);
     }
-    if (!profileData) {
-      const url2 = `${OPENXBL_BASE}/friends/search?gt=${encodeURIComponent(gamertag)}`;
-      console.log("[xbox] Trying:", url2);
-      const res2 = await fetch(url2, {
-        headers: openxblHeaders(),
-        signal: AbortSignal.timeout(6000),
-      });
 
-      const body2 = await res2.json();
-      console.log("[xbox] /friends/search status:", res2.status, "body:", JSON.stringify(body2).slice(0, 300));
-
-      if (res2.ok) {
-        const env2 = body2?.content ?? body2;
-        profileData =
-          (env2?.profileUsers as unknown[])?.[0] as Record<string, unknown> ??
-          (env2?.people as unknown[])?.[0] as Record<string, unknown> ??
-          null;
+    if (!res.ok) {
+      if (res.status === 401) {
+        console.error("OpenXBL auth failure");
+        return errorResponse("Service temporarily unavailable.", 503);
       }
-    }
-    if (!profileData) {
-      const url3 = `${OPENXBL_BASE}/people/search?q=${encodeURIComponent(gamertag)}`;
-      console.log("[xbox] Trying:", url3);
-      const res3 = await fetch(url3, {
-        headers: openxblHeaders(),
-        signal: AbortSignal.timeout(6000),
-      });
-
-      const body3 = await res3.json();
-      console.log("[xbox] /people/search status:", res3.status, "body:", JSON.stringify(body3).slice(0, 300));
-
-      if (res3.ok) {
-        const env3 = body3?.content ?? body3;
-        profileData =
-          (env3?.people as unknown[])?.[0] as Record<string, unknown> ??
-          (env3?.profileUsers as unknown[])?.[0] as Record<string, unknown> ??
-          null;
-      }
+      return errorResponse("Failed to look up Xbox profile. Please try again.", 502);
     }
 
+    const env = body?.content ?? body;
+    profileData =
+      (env?.profileUsers as unknown[])?.[0] as Record<string, unknown> ??
+      (env?.people as unknown[])?.[0] as Record<string, unknown> ??
+      null;
+
     if (!profileData) {
-      console.log("[xbox] All endpoints failed to find gamertag:", gamertag);
       return errorResponse("Gamertag not found. Check spelling and try again.", 404);
     }
 
-    console.log("[xbox] profileData keys:", Object.keys(profileData));
+        console.log("[xbox] profileData keys:", Object.keys(profileData));
+
     const settings: Record<string, string> = {};
     for (const s of (profileData.settings as { id: string; value: string }[]) ?? []) {
       settings[s.id] = s.value;
     }
+
     const profile = {
       gamertag: settings["Gamertag"] ?? (profileData.gamertag as string) ?? gamertag,
       gamerscore: parseInt(settings["Gamerscore"] ?? String(profileData.gamerscore ?? "0"), 10),
@@ -152,7 +125,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     };
 
     console.log("[xbox] Resolved profile:", profile.gamertag, "xuid:", profile.xuid);
-
     let forzaAchievement = null;
     try {
       const achRes = await fetch(
@@ -183,7 +155,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
 
     const response: XboxProfileResponse = { success: true, profile, forzaAchievement };
-
     setCache(gamertag, response);
 
     return NextResponse.json(response, {
