@@ -99,11 +99,9 @@ export default function HomePage() {
       setLoading(false);
     }
   }
-
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const previewUrl = URL.createObjectURL(file);
     setUploadedImage(previewUrl);
     setStep("upload");
@@ -161,6 +159,7 @@ export default function HomePage() {
         </div>
       )}
 
+      {/* ── Step: Enter Gamertag ── */}
       {step === "input" && (
         <form onSubmit={handleLookup} className="w-full max-w-sm flex flex-col gap-3">
           <input
@@ -182,8 +181,10 @@ export default function HomePage() {
         </form>
       )}
 
+      {/* ── Step: Profile confirmed, request screenshot ── */}
       {(step === "profile" || step === "upload") && profileData?.profile && (
         <div className="w-full max-w-sm flex flex-col gap-4">
+          {/* Profile card */}
           <div className="flex items-center gap-3 bg-[var(--surface)] rounded-xl p-4 border border-gray-800">
             {profileData.profile.displayPicRaw && (
               <img
@@ -208,6 +209,8 @@ export default function HomePage() {
             </div>
           </div>
 
+
+          {/* Recent screenshots from Xbox Live */}
           {(screenshotsLoading || screenshots.length > 0) && (
             <div className="bg-[var(--surface)] rounded-xl p-4 border border-gray-800 space-y-3">
               <p className="text-sm font-semibold text-white">
@@ -231,10 +234,12 @@ export default function HomePage() {
                       className="relative group rounded-lg overflow-hidden border-2 border-transparent hover:border-[var(--neon-pink)] transition-all"
                       title={shot.gameName}
                     >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={shot.thumbnailUrl}
+                        src={`/api/proxy-image?url=${encodeURIComponent(shot.thumbnailUrl)}`}
                         alt={shot.gameName}
                         className="w-full aspect-video object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
                       />
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <span className="text-white text-xs font-bold">Use this</span>
@@ -255,6 +260,7 @@ export default function HomePage() {
             </div>
           )}
 
+          {/* Step 1 */}
           <div className="bg-[var(--surface)] rounded-xl p-4 border border-gray-800 text-sm space-y-3">
             <p className="font-semibold text-white">
               <span className="text-[var(--neon-pink)] mr-2">①</span>
@@ -267,6 +273,7 @@ export default function HomePage() {
             </p>
           </div>
 
+          {/* Step 2 — Xbox app deep link */}
           <div className="bg-[var(--surface)] rounded-xl p-4 border border-gray-800 text-sm space-y-3">
             <p className="font-semibold text-white">
               <span className="text-[var(--neon-pink)] mr-2">②</span>
@@ -290,6 +297,7 @@ export default function HomePage() {
             </p>
           </div>
 
+          {/* Step 3 — upload */}
           <div className="bg-[var(--surface)] rounded-xl p-4 border border-gray-800 text-sm space-y-3">
             <p className="font-semibold text-white">
               <span className="text-[var(--neon-pink)] mr-2">③</span>
@@ -322,6 +330,7 @@ export default function HomePage() {
         </div>
       )}
 
+      {/* ── Step: Results ── */}
       {step === "result" && analysisResult && uploadedImage && (
         <ResultView
           result={analysisResult}
@@ -332,7 +341,6 @@ export default function HomePage() {
     </main>
   );
 }
-
 
 function ResultView({
   result,
@@ -354,9 +362,12 @@ function ResultView({
         <span className="text-xs text-gray-500">{result.processingTimeMs}ms</span>
       </div>
 
-     
+      {/* Annotated image */}
       <div className="relative w-full rounded-xl overflow-hidden border border-gray-800">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={imageUrl} alt="Map screenshot" className="w-full block" />
+
+        {/* Overlay bounding boxes */}
         {result.unexploredSegments.map((seg, i) => (
           <div
             key={i}
@@ -371,7 +382,8 @@ function ResultView({
             }}
           />
         ))}
-        
+
+        {/* Centroid dots for tiny segments */}
         {result.unexploredSegments.map((seg, i) => (
           <div
             key={`dot-${i}`}
