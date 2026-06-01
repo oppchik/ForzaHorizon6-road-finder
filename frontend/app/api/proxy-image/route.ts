@@ -45,8 +45,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   if (!isAllowedUrl(decodedUrl)) {
+    console.log("[proxy-image] BLOCKED domain:", new URL(decodedUrl).hostname, "full url:", decodedUrl.slice(0, 100));
     return errorResponse("URL not allowed. Only Xbox CDN domains are supported.", 403);
   }
+  console.log("[proxy-image] Fetching:", decodedUrl.slice(0, 100));
 
   try {
     const upstream = await fetch(decodedUrl, {
