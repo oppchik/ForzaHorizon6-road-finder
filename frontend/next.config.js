@@ -1,5 +1,4 @@
 const nextConfig = {
-  
   async headers() {
     return [
       {
@@ -16,9 +15,9 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline'", 
+              "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'", 
-              "img-src 'self' data: blob: https://avatar.xboxlive.com https://images-eds-ssl.xboxlive.com",
+              "img-src 'self' data: blob: https://*.xboxlive.com https://*.xbox.com",
               "connect-src 'self'",
               "font-src 'self'",
               "object-src 'none'",
