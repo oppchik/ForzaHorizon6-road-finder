@@ -7,6 +7,11 @@ const ALLOWED_HOSTS = [
   "images-eds-ssl.xboxlive.com",
   "xboxlive.com",
   "xboxunits.com",
+  "gameclips-interest.xboxlive.com",
+  "screenshotscontent-d2009.xboxlive.com",
+  "xblobstorage.blob.core.windows.net",
+  "ugc.xboxlive.com",
+  "compass-ssl.xbox.com",
 ];
 
 const MAX_BYTES = 15 * 1024 * 1024; // 15 MB
