@@ -16,7 +16,7 @@ const ALLOWED_HOSTS = [
   "xbox.com",               
 ];
 
-const MAX_BYTES = 15 * 1024 * 1024; 
+const MAX_BYTES = 15 * 1024 * 1024; // 15 MB
 
 function isAllowedUrl(raw: string): boolean {
   try {
@@ -67,9 +67,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     const contentType = upstream.headers.get("content-type") ?? "";
     console.log("[proxy-image] CDN ok, content-type:", contentType, "size:", upstream.headers.get("content-length"));
-    if (!contentType.startsWith("image/")) {
+
+    const responseContentType =
+      contentType.startsWith("image/")
+        ? contentType
+        : contentType === "application/octet-stream"
+        ? "image/jpeg"
+        : null;
+
+    if (!responseContentType) {
       return errorResponse("Remote resource is not an image.", 422);
     }
+
     const reader = upstream.body?.getReader();
     if (!reader) return errorResponse("Empty response from CDN.", 502);
 
@@ -86,6 +95,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       }
       chunks.push(value);
     }
+
     const buffer = new Uint8Array(totalBytes);
     let offset = 0;
     for (const chunk of chunks) {
@@ -97,7 +107,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       status: 200,
       headers: {
         ...getCorsHeaders(origin),
-        "Content-Type": contentType,
+        "Content-Type": responseContentType,
         "Content-Length": String(totalBytes),
         "Cache-Control": "private, max-age=300",
       },
