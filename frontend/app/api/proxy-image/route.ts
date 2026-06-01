@@ -5,13 +5,15 @@ const ALLOWED_HOSTS = [
   "gameclipscontent-d2009.xboxlive.com",
   "screenshotscontent.xboxlive.com",
   "images-eds-ssl.xboxlive.com",
-  "xboxlive.com",
+  "xboxlive.com",           
+  "media.xboxlive.com",    
   "xboxunits.com",
   "gameclips-interest.xboxlive.com",
   "screenshotscontent-d2009.xboxlive.com",
   "xblobstorage.blob.core.windows.net",
   "ugc.xboxlive.com",
   "compass-ssl.xbox.com",
+  "xbox.com",               
 ];
 
 const MAX_BYTES = 15 * 1024 * 1024; // 15 MB
@@ -19,6 +21,7 @@ const MAX_BYTES = 15 * 1024 * 1024; // 15 MB
 function isAllowedUrl(raw: string): boolean {
   try {
     const parsed = new URL(raw);
+    
     if (parsed.protocol !== "https:") return false;
     return ALLOWED_HOSTS.some(
       (host) => parsed.hostname === host || parsed.hostname.endsWith("." + host)
