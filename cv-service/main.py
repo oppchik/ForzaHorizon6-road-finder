@@ -32,28 +32,12 @@ from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 INTERNAL_SECRET = os.getenv("INTERNAL_SERVICE_SECRET", "")
 MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
 ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg", "image/webp"}
-
-# ---------------------------------------------------------------------------
-# Forza Horizon map colour tuning
-#
-# These HSV ranges target the "unexplored road" grey segments.
-# Forza Horizon 6 maps use a slightly warm grey for unexplored roads:
-#   - Low saturation (roads are desaturated)
-#   - Medium-low value (darker than explored white/yellow roads)
-#
-# IMPORTANT: These values will need calibration once FH6 ships.
-# Run `python calibrate.py <screenshot.png>` to fine-tune.
-# ---------------------------------------------------------------------------
 
 # HSV range for unexplored roads (tweak after testing with real screenshots)
 UNEXPLORED_HSV_LOWER = np.array([0,   0,  90])   # H, S, V min
@@ -68,10 +52,6 @@ MAX_CONTOUR_AREA_FRACTION = 0.3   # ignore blobs > 30% of image (background)
 # Morphological kernel sizes
 MORPH_CLOSE_KERNEL = (5, 5)   # close small gaps in road lines
 MORPH_OPEN_KERNEL  = (3, 3)   # remove isolated noise pixels
-
-# ---------------------------------------------------------------------------
-# Pydantic models
-# ---------------------------------------------------------------------------
 
 class BoundingBox(BaseModel):
     x: float
@@ -95,19 +75,13 @@ class AnalysisResult(BaseModel):
     processingTimeMs: int
     error: str | None = None
 
-# ---------------------------------------------------------------------------
-# App
-# ---------------------------------------------------------------------------
-
 app = FastAPI(
     title="Forza Road Finder CV Service",
     description="Computer vision microservice for detecting unexplored roads",
-    docs_url=None,   # Disable Swagger UI in production
+    docs_url=None,   
     redoc_url=None,
 )
 
-# Only the Next.js backend talks to us — no browser CORS needed.
-# Restrict origins to the Next.js server.
 allowed_origins = os.getenv("ALLOWED_CV_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
@@ -120,7 +94,6 @@ app.add_middleware(
 def verify_secret(secret: str | None) -> None:
     """Reject requests missing the shared secret."""
     if not INTERNAL_SECRET:
-        # Dev mode: skip check if secret not configured
         logger.warning("INTERNAL_SERVICE_SECRET not set — accepting all requests (dev mode)")
         return
     if secret != INTERNAL_SECRET:
@@ -136,6 +109,51 @@ def decode_image(data: bytes) -> np.ndarray:
     return img
 
 
+def validate_is_map(img_bgr: np.ndarray) -> tuple[bool, str]:
+    """
+    Быстрая проверка что скриншот — карта Forza, а не геймплей/меню.
+
+    Карта имеет характерные признаки:
+    - Преобладает зелёный/синий/коричневый фон (вид сверху на местность)
+    - Много тонких светлых линий (дороги) относительно общей площади
+    - Нет ярких насыщенных объектов занимающих большую площадь (машины, небо)
+
+    Возвращает (is_valid, reason).
+    """
+    hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+    h, w = img_bgr.shape[:2]
+    total_px = h * w
+
+    H, S, V = hsv[:,:,0], hsv[:,:,1], hsv[:,:,2]
+
+    low_sat_ratio = float(np.sum(S < 80) / total_px)
+    road_like = (V > 140) & (S < 60)
+    road_ratio = float(np.sum(road_like) / total_px)
+
+    sky_like = (H > 85) & (H < 135) & (S > 90) & (V > 140)
+    sky_ratio = float(np.sum(sky_like) / total_px)
+
+    bottom_third = img_bgr[int(h * 0.66):, :]
+    bottom_dark = np.sum(cv2.cvtColor(bottom_third, cv2.COLOR_BGR2GRAY) < 60)
+    bottom_dark_ratio = float(bottom_dark / (bottom_third.shape[0] * bottom_third.shape[1]))
+
+    logger.info(
+        "Map validation: low_sat=%.2f road=%.2f sky=%.2f bottom_dark=%.2f",
+        low_sat_ratio, road_ratio, sky_ratio, bottom_dark_ratio
+    )
+
+    if sky_ratio > 0.15:
+        return False, "This looks like a gameplay screenshot, not a map. Please open the map in-game and take a screenshot of it."
+
+    if bottom_dark_ratio > 0.4 and road_ratio < 0.05:
+        return False, "This looks like a gameplay screenshot. Please open the full map (press the Xbox button → Map) and screenshot that instead."
+
+    if low_sat_ratio < 0.35:
+        return False, "Could not detect a map in this screenshot. Make sure you screenshot the full map view, not gameplay."
+
+    return True, ""
+
+
 def find_unexplored_roads(img_bgr: np.ndarray) -> List[RoadSegment]:
     """
     Core CV pipeline. Returns a list of RoadSegment objects for each
@@ -143,23 +161,15 @@ def find_unexplored_roads(img_bgr: np.ndarray) -> List[RoadSegment]:
     """
     h, w = img_bgr.shape[:2]
     total_pixels = h * w
-
-    # 1. Convert to HSV
     img_hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
-
-    # 2. Threshold to isolate unexplored-road colour range
     mask = cv2.inRange(img_hsv, UNEXPLORED_HSV_LOWER, UNEXPLORED_HSV_UPPER)
-
-    # 3. Morphological clean-up
     kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, MORPH_CLOSE_KERNEL)
     kernel_open  = cv2.getStructuringElement(cv2.MORPH_RECT, MORPH_OPEN_KERNEL)
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN,  kernel_open)
 
-    # 4. Find contours
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    # Scale min area to the actual resolution (calibrated for 1080p)
     scale = (w * h) / (1920 * 1080)
     min_area = int(MIN_CONTOUR_AREA_1080P * scale)
     max_area = int(total_pixels * MAX_CONTOUR_AREA_FRACTION)
@@ -172,8 +182,6 @@ def find_unexplored_roads(img_bgr: np.ndarray) -> List[RoadSegment]:
             continue
 
         x, y, cw, ch = cv2.boundingRect(cnt)
-
-        # Centroid via moments (more accurate than bbox centre for irregular shapes)
         M = cv2.moments(cnt)
         if M["m00"] == 0:
             cx, cy = x + cw / 2, y + ch / 2
@@ -181,7 +189,6 @@ def find_unexplored_roads(img_bgr: np.ndarray) -> List[RoadSegment]:
             cx = M["m10"] / M["m00"]
             cy = M["m01"] / M["m00"]
 
-        # Confidence: ratio of masked pixels inside the bounding box
         roi_mask = mask[y : y + ch, x : x + cw]
         masked_px = int(np.count_nonzero(roi_mask))
         confidence = round(masked_px / (cw * ch), 3) if cw * ch > 0 else 0.0
@@ -200,15 +207,8 @@ def find_unexplored_roads(img_bgr: np.ndarray) -> List[RoadSegment]:
                 confidence=confidence,
             )
         )
-
-    # Sort by area descending so the biggest unexplored blobs come first
     segments.sort(key=lambda s: s.pixelArea, reverse=True)
     return segments
-
-
-# ---------------------------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------------------------
 
 @app.get("/health")
 def health() -> dict:
@@ -221,18 +221,13 @@ async def analyze(
     x_internal_secret: str | None = Header(default=None, alias="X-Internal-Secret"),
 ) -> AnalysisResult:
     start = time.monotonic()
-
-    # Auth
     verify_secret(x_internal_secret)
-
-    # Content-type check (defence-in-depth; Next.js already validated magic bytes)
     if image.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status_code=422,
             detail=f"Unsupported content type: {image.content_type}",
         )
 
-    # Read (with size cap)
     data = await image.read(MAX_IMAGE_BYTES + 1)
     if len(data) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=422, detail="Image exceeds 10 MB size limit.")
@@ -246,10 +241,21 @@ async def analyze(
     logger.info("Analysing image %dx%d (%d bytes)", w, h, len(data))
 
     try:
+        is_map, reason = validate_is_map(img_bgr)
+        if not is_map:
+            return AnalysisResult(
+                success=False,
+                imageWidth=w,
+                imageHeight=h,
+                unexploredSegments=[],
+                totalUnexplored=0,
+                processingTimeMs=int((time.monotonic() - start) * 1000),
+                error=reason,
+            )
+
         segments = find_unexplored_roads(img_bgr)
     except Exception as exc:
         logger.exception("CV pipeline error")
-        # Don't leak internal tracebacks
         raise HTTPException(status_code=500, detail="Image analysis failed internally.") from exc
 
     elapsed_ms = int((time.monotonic() - start) * 1000)
