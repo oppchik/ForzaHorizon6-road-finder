@@ -37,7 +37,6 @@ export default function HomePage() {
 
       setProfileData(data);
       setStep("profile");
-
       if (data.profile?.xuid) {
         setScreenshotsLoading(true);
         fetch(`/api/screenshots?xuid=${data.profile.xuid}`)
@@ -74,6 +73,7 @@ export default function HomePage() {
       const blob = await proxyRes.blob();
       const previewUrl = URL.createObjectURL(blob);
       setUploadedImage(previewUrl);
+
       const formData = new FormData();
       formData.append("image", blob, "xbox-screenshot.jpg");
 
@@ -99,6 +99,7 @@ export default function HomePage() {
       setLoading(false);
     }
   }
+
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -353,9 +354,19 @@ function ResultView({
 }) {
   return (
     <div className="w-full max-w-lg flex flex-col gap-4">
+      {/* Validation error — not a map screenshot */}
+      {!result.success && result.error && (
+        <div className="bg-yellow-900/40 border border-yellow-500 rounded-xl p-4 text-yellow-200 text-sm">
+          <p className="font-bold mb-1">⚠️ Not a map screenshot</p>
+          <p>{result.error}</p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h2 className="font-bold text-lg">
-          {result.totalUnexplored === 0
+          {!result.success
+            ? "❌ Analysis failed"
+            : result.totalUnexplored === 0
             ? "✅ All roads explored!"
             : `🗺️ ${result.totalUnexplored} unexplored segment${result.totalUnexplored !== 1 ? "s" : ""} found`}
         </h2>
