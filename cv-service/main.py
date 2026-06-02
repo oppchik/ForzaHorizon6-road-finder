@@ -78,10 +78,9 @@ class AnalysisResult(BaseModel):
 app = FastAPI(
     title="Forza Road Finder CV Service",
     description="Computer vision microservice for detecting unexplored roads",
-    docs_url=None,   
+    docs_url=None,   # Disable Swagger UI in production
     redoc_url=None,
 )
-
 allowed_origins = os.getenv("ALLOWED_CV_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
@@ -110,16 +109,6 @@ def decode_image(data: bytes) -> np.ndarray:
 
 
 def validate_is_map(img_bgr: np.ndarray) -> tuple[bool, str]:
-    """
-    Быстрая проверка что скриншот — карта Forza, а не геймплей/меню.
-
-    Карта имеет характерные признаки:
-    - Преобладает зелёный/синий/коричневый фон (вид сверху на местность)
-    - Много тонких светлых линий (дороги) относительно общей площади
-    - Нет ярких насыщенных объектов занимающих большую площадь (машины, небо)
-
-    Возвращает (is_valid, reason).
-    """
     hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
     h, w = img_bgr.shape[:2]
     total_px = h * w
@@ -127,6 +116,7 @@ def validate_is_map(img_bgr: np.ndarray) -> tuple[bool, str]:
     H, S, V = hsv[:,:,0], hsv[:,:,1], hsv[:,:,2]
 
     low_sat_ratio = float(np.sum(S < 80) / total_px)
+
     road_like = (V > 140) & (S < 60)
     road_ratio = float(np.sum(road_like) / total_px)
 
@@ -142,14 +132,8 @@ def validate_is_map(img_bgr: np.ndarray) -> tuple[bool, str]:
         low_sat_ratio, road_ratio, sky_ratio, bottom_dark_ratio
     )
 
-    if sky_ratio > 0.15:
-        return False, "This looks like a gameplay screenshot, not a map. Please open the map in-game and take a screenshot of it."
-
-    if bottom_dark_ratio > 0.4 and road_ratio < 0.05:
-        return False, "This looks like a gameplay screenshot. Please open the full map (press the Xbox button → Map) and screenshot that instead."
-
-    if low_sat_ratio < 0.35:
-        return False, "Could not detect a map in this screenshot. Make sure you screenshot the full map view, not gameplay."
+    if sky_ratio > 0.25 and road_ratio < 0.02:
+        return False, "This looks like a gameplay screenshot, not a map. Please open the map in-game (Menu → Map) and take a screenshot of it."
 
     return True, ""
 
@@ -161,15 +145,23 @@ def find_unexplored_roads(img_bgr: np.ndarray) -> List[RoadSegment]:
     """
     h, w = img_bgr.shape[:2]
     total_pixels = h * w
+
+    # 1. Convert to HSV
     img_hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+
+    # 2. Threshold to isolate unexplored-road colour range
     mask = cv2.inRange(img_hsv, UNEXPLORED_HSV_LOWER, UNEXPLORED_HSV_UPPER)
+
+    # 3. Morphological clean-up
     kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, MORPH_CLOSE_KERNEL)
     kernel_open  = cv2.getStructuringElement(cv2.MORPH_RECT, MORPH_OPEN_KERNEL)
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN,  kernel_open)
 
+    # 4. Find contours
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+    # Scale min area to the actual resolution (calibrated for 1080p)
     scale = (w * h) / (1920 * 1080)
     min_area = int(MIN_CONTOUR_AREA_1080P * scale)
     max_area = int(total_pixels * MAX_CONTOUR_AREA_FRACTION)
@@ -182,6 +174,8 @@ def find_unexplored_roads(img_bgr: np.ndarray) -> List[RoadSegment]:
             continue
 
         x, y, cw, ch = cv2.boundingRect(cnt)
+
+        # Centroid via moments (more accurate than bbox centre for irregular shapes)
         M = cv2.moments(cnt)
         if M["m00"] == 0:
             cx, cy = x + cw / 2, y + ch / 2
@@ -189,6 +183,7 @@ def find_unexplored_roads(img_bgr: np.ndarray) -> List[RoadSegment]:
             cx = M["m10"] / M["m00"]
             cy = M["m01"] / M["m00"]
 
+        # Confidence: ratio of masked pixels inside the bounding box
         roi_mask = mask[y : y + ch, x : x + cw]
         masked_px = int(np.count_nonzero(roi_mask))
         confidence = round(masked_px / (cw * ch), 3) if cw * ch > 0 else 0.0
@@ -207,8 +202,11 @@ def find_unexplored_roads(img_bgr: np.ndarray) -> List[RoadSegment]:
                 confidence=confidence,
             )
         )
+
+    # Sort by area descending so the biggest unexplored blobs come first
     segments.sort(key=lambda s: s.pixelArea, reverse=True)
     return segments
+
 
 @app.get("/health")
 def health() -> dict:
@@ -221,13 +219,15 @@ async def analyze(
     x_internal_secret: str | None = Header(default=None, alias="X-Internal-Secret"),
 ) -> AnalysisResult:
     start = time.monotonic()
+
+    # Auth
     verify_secret(x_internal_secret)
+
     if image.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status_code=422,
             detail=f"Unsupported content type: {image.content_type}",
         )
-
     data = await image.read(MAX_IMAGE_BYTES + 1)
     if len(data) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=422, detail="Image exceeds 10 MB size limit.")
