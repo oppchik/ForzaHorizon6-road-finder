@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { XboxProfileResponse, AnalysisResult } from "@/types";
 import type { ScreenshotItem } from "@/app/api/screenshots/route";
 
@@ -407,43 +407,7 @@ function ResultView({
         </h2>
         <span className="text-xs text-gray-500">{result.processingTimeMs}ms</span>
       </div>
-      <div className="relative w-full rounded-xl overflow-hidden border border-gray-800">
-        <img src={imageUrl} alt="Map screenshot" className="w-full block" />
-        {result.unexploredSegments.map((seg, i) => (
-          <div
-            key={i}
-            className="absolute pointer-events-none"
-            style={{
-              left: `${seg.bbox.x * 100}%`,
-              top: `${seg.bbox.y * 100}%`,
-              width: `max(${seg.bbox.width * 100}%, 12px)`,
-              height: `max(${seg.bbox.height * 100}%, 12px)`,
-              border: "3px solid #ff2d78",
-              borderRadius: "3px",
-              boxShadow: "0 0 0 1px #000, 0 0 12px #ff2d78, inset 0 0 6px rgba(255,45,120,0.2)",
-              backgroundColor: "rgba(255,45,120,0.08)",
-            }}
-          />
-        ))}
-        {result.unexploredSegments.map((seg, i) => (
-          <div
-            key={`dot-${i}`}
-            className="absolute pointer-events-none"
-            style={{
-              left: `${seg.centerX * 100}%`,
-              top: `${seg.centerY * 100}%`,
-              width: "14px",
-              height: "14px",
-              marginLeft: "-7px",
-              marginTop: "-7px",
-              borderRadius: "50%",
-              backgroundColor: "#39ff14",
-              border: "2px solid #000",
-              boxShadow: "0 0 10px #39ff14",
-            }}
-          />
-        ))}
-      </div>
+      <MapCanvas imageUrl={imageUrl} segments={result.unexploredSegments} />
 
       <p className="text-xs text-gray-500 text-center">
         Pink boxes = unexplored road segments · Green dots = exact centres
@@ -464,5 +428,61 @@ function ResultView({
         </button>
       </div>
     </div>
+  );
+}
+
+function MapCanvas({ imageUrl, segments }: { imageUrl: string; segments: import("@/types").RoadSegment[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      setSize({ w: img.naturalWidth, h: img.naturalHeight });
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+
+      for (const seg of segments) {
+        const x = seg.bbox.x * img.naturalWidth;
+        const y = seg.bbox.y * img.naturalHeight;
+        const w = Math.max(seg.bbox.width * img.naturalWidth, 8);
+        const h = Math.max(seg.bbox.height * img.naturalHeight, 8);
+
+        ctx.strokeStyle = "#ff2d78";
+        ctx.lineWidth = Math.max(2, img.naturalWidth / 400);
+        ctx.shadowColor = "#ff2d78";
+        ctx.shadowBlur = 8;
+        ctx.strokeRect(x, y, w, h);
+        ctx.fillStyle = "rgba(255,45,120,0.08)";
+        ctx.fillRect(x, y, w, h);
+
+        const cx = seg.centerX * img.naturalWidth;
+        const cy = seg.centerY * img.naturalHeight;
+        const r = Math.max(5, img.naturalWidth / 200);
+        ctx.shadowColor = "#39ff14";
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = "#39ff14";
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 0;
+        ctx.stroke();
+      }
+    };
+    img.src = imageUrl;
+  }, [imageUrl, segments]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="w-full rounded-xl border border-gray-800 block"
+      style={{ imageRendering: "crisp-edges" }}
+    />
   );
 }
