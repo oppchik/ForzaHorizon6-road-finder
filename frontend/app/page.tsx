@@ -17,7 +17,6 @@ export default function HomePage() {
   const [screenshots, setScreenshots] = useState<ScreenshotItem[]>([]);
   const [screenshotsLoading, setScreenshotsLoading] = useState(false);
 
-
   async function handleLookup(e: React.FormEvent) {
     e.preventDefault();
     if (!gamertag.trim()) return;
@@ -39,7 +38,6 @@ export default function HomePage() {
       setProfileData(data);
       setStep("profile");
 
-
       if (data.profile?.xuid) {
         setScreenshotsLoading(true);
         fetch(`/api/screenshots?xuid=${data.profile.xuid}`)
@@ -58,7 +56,6 @@ export default function HomePage() {
       setLoading(false);
     }
   }
-
 
   async function resizeImage(blob: Blob, maxWidth = 960): Promise<Blob> {
     return new Promise((resolve) => {
@@ -140,11 +137,9 @@ export default function HomePage() {
     }
   }
 
-
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
 
     const previewUrl = URL.createObjectURL(file);
     setUploadedImage(previewUrl);
@@ -199,7 +194,6 @@ export default function HomePage() {
     setError(null);
   }
 
-
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-4 gap-6">
       <h1 className="text-3xl font-bold text-center">
@@ -214,8 +208,6 @@ export default function HomePage() {
           {error}
         </div>
       )}
-
-      {}
       {step === "input" && (
         <form onSubmit={handleLookup} className="w-full max-w-sm flex flex-col gap-3">
           <input
@@ -236,11 +228,8 @@ export default function HomePage() {
           </button>
         </form>
       )}
-
-      {}
       {(step === "profile" || step === "upload") && profileData?.profile && (
         <div className="w-full max-w-sm flex flex-col gap-4">
-          {}
           <div className="flex items-center gap-3 bg-[var(--surface)] rounded-xl p-4 border border-gray-800">
             {profileData.profile.displayPicRaw && (
 
@@ -265,9 +254,6 @@ export default function HomePage() {
               )}
             </div>
           </div>
-
-
-          {}
           {(screenshotsLoading || screenshots.length > 0) && (
             <div className="bg-[var(--surface)] rounded-xl p-4 border border-gray-800 space-y-3">
               <p className="text-sm font-semibold text-white">
@@ -291,7 +277,6 @@ export default function HomePage() {
                       className="relative group rounded-lg overflow-hidden border-2 border-transparent hover:border-[var(--neon-pink)] transition-all"
                       title={shot.gameName}
                     >
-                      {}
                       <img
                         src={`/api/proxy-image?url=${encodeURIComponent(shot.thumbnailUrl)}`}
                         alt={shot.gameName}
@@ -316,8 +301,6 @@ export default function HomePage() {
               )}
             </div>
           )}
-
-          {}
           <div className="bg-[var(--surface)] rounded-xl p-4 border border-gray-800 text-sm space-y-3">
             <p className="font-semibold text-white">
               <span className="text-[var(--neon-pink)] mr-2">①</span>
@@ -329,8 +312,6 @@ export default function HomePage() {
               <strong className="text-white">Share</strong> → Screenshot
             </p>
           </div>
-
-          {}
           <div className="bg-[var(--surface)] rounded-xl p-4 border border-gray-800 text-sm space-y-3">
             <p className="font-semibold text-white">
               <span className="text-[var(--neon-pink)] mr-2">②</span>
@@ -353,8 +334,6 @@ export default function HomePage() {
               iOS &amp; Android — requires Xbox app installed
             </p>
           </div>
-
-          {}
           <div className="bg-[var(--surface)] rounded-xl p-4 border border-gray-800 text-sm space-y-3">
             <p className="font-semibold text-white">
               <span className="text-[var(--neon-pink)] mr-2">③</span>
@@ -386,8 +365,6 @@ export default function HomePage() {
           </button>
         </div>
       )}
-
-      {}
       {step === "result" && analysisResult && uploadedImage && (
         <ResultView
           result={analysisResult}
@@ -399,7 +376,6 @@ export default function HomePage() {
     </main>
   );
 }
-
 
 function ResultView({
   result,
@@ -414,7 +390,6 @@ function ResultView({
 }) {
   return (
     <div className="w-full max-w-lg flex flex-col gap-4">
-      {}
       {!result.success && result.error && (
         <div className="bg-yellow-900/40 border border-yellow-500 rounded-xl p-4 text-yellow-200 text-sm">
           <p className="font-bold mb-1">⚠️ Not a map screenshot</p>
@@ -432,13 +407,8 @@ function ResultView({
         </h2>
         <span className="text-xs text-gray-500">{result.processingTimeMs}ms</span>
       </div>
-
-      {}
       <div className="relative w-full rounded-xl overflow-hidden border border-gray-800">
-        {}
         <img src={imageUrl} alt="Map screenshot" className="w-full block" />
-
-        {}
         {result.unexploredSegments.map((seg, i) => (
           <div
             key={i}
@@ -455,8 +425,6 @@ function ResultView({
             }}
           />
         ))}
-
-        {}
         {result.unexploredSegments.map((seg, i) => (
           <div
             key={`dot-${i}`}
