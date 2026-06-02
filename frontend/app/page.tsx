@@ -17,7 +17,7 @@ export default function HomePage() {
   const [screenshots, setScreenshots] = useState<ScreenshotItem[]>([]);
   const [screenshotsLoading, setScreenshotsLoading] = useState(false);
 
-  // ── Step 1: Look up Xbox profile ──────────────────────────────────────────
+
   async function handleLookup(e: React.FormEvent) {
     e.preventDefault();
     if (!gamertag.trim()) return;
@@ -39,7 +39,7 @@ export default function HomePage() {
       setProfileData(data);
       setStep("profile");
 
-      // Fetch public screenshots in background (non-blocking)
+
       if (data.profile?.xuid) {
         setScreenshotsLoading(true);
         fetch(`/api/screenshots?xuid=${data.profile.xuid}`)
@@ -60,7 +60,23 @@ export default function HomePage() {
   }
 
 
-  // ── Step 2b: Use selected Xbox screenshot ────────────────────────────────
+  async function resizeImage(blob: Blob, maxWidth = 960): Promise<Blob> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(blob);
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob((b) => resolve(b ?? blob), "image/jpeg", 0.85);
+      };
+      img.src = url;
+    });
+  }
+
   async function handleScreenshotSelect(fullUrl: string) {
     setLoading(true);
     setError(null);
@@ -87,8 +103,11 @@ export default function HomePage() {
       const previewUrl = URL.createObjectURL(blob);
       setUploadedImage(previewUrl);
 
+      const resized = await resizeImage(blob, 960);
+      console.log("[select] resized size:", resized.size);
+
       const formData = new FormData();
-      formData.append("image", blob, "xbox-screenshot.jpg");
+      formData.append("image", resized, "xbox-screenshot.jpg");
 
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -121,12 +140,12 @@ export default function HomePage() {
     }
   }
 
-  // ── Step 2: Analyse uploaded screenshot ───────────────────────────────────
+
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Preview
+
     const previewUrl = URL.createObjectURL(file);
     setUploadedImage(previewUrl);
     setStep("upload");
@@ -134,8 +153,10 @@ export default function HomePage() {
     setError(null);
 
     try {
+      const resizedFile = await resizeImage(file, 960);
+
       const formData = new FormData();
-      formData.append("image", file);
+      formData.append("image", resizedFile, "map.jpg");
 
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -171,14 +192,14 @@ export default function HomePage() {
   }
 
   function goBack() {
-    // Вернуться к скриншотам, не сбрасывая геймертаг
+
     setStep("profile");
     setAnalysisResult(null);
     setUploadedImage(null);
     setError(null);
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-4 gap-6">
       <h1 className="text-3xl font-bold text-center">
@@ -194,7 +215,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ── Step: Enter Gamertag ── */}
+      {}
       {step === "input" && (
         <form onSubmit={handleLookup} className="w-full max-w-sm flex flex-col gap-3">
           <input
@@ -216,13 +237,13 @@ export default function HomePage() {
         </form>
       )}
 
-      {/* ── Step: Profile confirmed, request screenshot ── */}
+      {}
       {(step === "profile" || step === "upload") && profileData?.profile && (
         <div className="w-full max-w-sm flex flex-col gap-4">
-          {/* Profile card */}
+          {}
           <div className="flex items-center gap-3 bg-[var(--surface)] rounded-xl p-4 border border-gray-800">
             {profileData.profile.displayPicRaw && (
-              // eslint-disable-next-line @next/next/no-img-element
+
               <img
                 src={profileData.profile.displayPicRaw}
                 alt="Avatar"
@@ -246,7 +267,7 @@ export default function HomePage() {
           </div>
 
 
-          {/* Recent screenshots from Xbox Live */}
+          {}
           {(screenshotsLoading || screenshots.length > 0) && (
             <div className="bg-[var(--surface)] rounded-xl p-4 border border-gray-800 space-y-3">
               <p className="text-sm font-semibold text-white">
@@ -270,7 +291,7 @@ export default function HomePage() {
                       className="relative group rounded-lg overflow-hidden border-2 border-transparent hover:border-[var(--neon-pink)] transition-all"
                       title={shot.gameName}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {}
                       <img
                         src={`/api/proxy-image?url=${encodeURIComponent(shot.thumbnailUrl)}`}
                         alt={shot.gameName}
@@ -296,7 +317,7 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* Step 1 */}
+          {}
           <div className="bg-[var(--surface)] rounded-xl p-4 border border-gray-800 text-sm space-y-3">
             <p className="font-semibold text-white">
               <span className="text-[var(--neon-pink)] mr-2">①</span>
@@ -309,7 +330,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Step 2 — Xbox app deep link */}
+          {}
           <div className="bg-[var(--surface)] rounded-xl p-4 border border-gray-800 text-sm space-y-3">
             <p className="font-semibold text-white">
               <span className="text-[var(--neon-pink)] mr-2">②</span>
@@ -333,7 +354,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Step 3 — upload */}
+          {}
           <div className="bg-[var(--surface)] rounded-xl p-4 border border-gray-800 text-sm space-y-3">
             <p className="font-semibold text-white">
               <span className="text-[var(--neon-pink)] mr-2">③</span>
@@ -366,7 +387,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ── Step: Results ── */}
+      {}
       {step === "result" && analysisResult && uploadedImage && (
         <ResultView
           result={analysisResult}
@@ -379,9 +400,6 @@ export default function HomePage() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// ResultView — overlays bounding boxes on the uploaded image
-// ---------------------------------------------------------------------------
 
 function ResultView({
   result,
@@ -396,7 +414,7 @@ function ResultView({
 }) {
   return (
     <div className="w-full max-w-lg flex flex-col gap-4">
-      {/* Validation error — not a map screenshot */}
+      {}
       {!result.success && result.error && (
         <div className="bg-yellow-900/40 border border-yellow-500 rounded-xl p-4 text-yellow-200 text-sm">
           <p className="font-bold mb-1">⚠️ Not a map screenshot</p>
@@ -415,12 +433,12 @@ function ResultView({
         <span className="text-xs text-gray-500">{result.processingTimeMs}ms</span>
       </div>
 
-      {/* Annotated image */}
+      {}
       <div className="relative w-full rounded-xl overflow-hidden border border-gray-800">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {}
         <img src={imageUrl} alt="Map screenshot" className="w-full block" />
 
-        {/* Overlay bounding boxes */}
+        {}
         {result.unexploredSegments.map((seg, i) => (
           <div
             key={i}
@@ -438,7 +456,7 @@ function ResultView({
           />
         ))}
 
-        {/* Centroid dots — always visible even for tiny segments */}
+        {}
         {result.unexploredSegments.map((seg, i) => (
           <div
             key={`dot-${i}`}
