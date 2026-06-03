@@ -86,20 +86,35 @@ def find_unexplored_roads(img_bgr: np.ndarray) -> List[RoadSegment]:
     h, w = img_bgr.shape[:2]
     total_pixels = h * w
 
-    target = np.array([128, 128, 128], dtype=np.int32)
-    diff = np.abs(img_bgr.astype(np.int32) - target)
-    dist = diff.max(axis=2)
+    img_f = img_bgr.astype(np.float32)
+    B, G, R = img_f[:,:,0], img_f[:,:,1], img_f[:,:,2]
+    mx = np.maximum(np.maximum(B, G), R)
+    mn = np.minimum(np.minimum(B, G), R)
+    saturation = mx - mn
+    brightness = (B + G + R) / 3
 
-    mask = (dist <= 18).astype(np.uint8) * 255
+    grey_road = (
+        (saturation < 28) &
+        (brightness > 80) &
+        (brightness < 150) &
+        ((G - R) < 20) &
+        ((B - R) < 25)
+    )
+
+    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (11, 11), 0)
+    local_contrast = gray.astype(np.int16) - blur.astype(np.int16)
+    grey_road = grey_road & (local_contrast > 3)
 
     margin_top    = int(h * 0.07)
     margin_bottom = int(h * 0.09)
     margin_lr     = int(w * 0.02)
-    mask[:margin_top, :]      = 0
-    mask[h-margin_bottom:, :] = 0
-    mask[:, :margin_lr]       = 0
-    mask[:, w-margin_lr:]     = 0
+    grey_road[:margin_top, :]      = False
+    grey_road[h-margin_bottom:, :] = False
+    grey_road[:, :margin_lr]       = False
+    grey_road[:, w-margin_lr:]     = False
 
+    mask = grey_road.astype(np.uint8) * 255
     k_close = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
     k_open  = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, k_close)
@@ -148,9 +163,8 @@ def find_unexplored_roads(img_bgr: np.ndarray) -> List[RoadSegment]:
         ))
 
     segments.sort(key=lambda s: s.pixelArea, reverse=True)
-    logger.info("Found %d unexplored segments (808080)", len(segments))
+    logger.info("Found %d unexplored segments (lowsat+localcontrast)", len(segments))
     return segments
-
 
 @app.get("/health")
 def health() -> dict:
