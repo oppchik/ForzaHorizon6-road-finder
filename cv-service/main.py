@@ -1,7 +1,6 @@
 import os
 import time
 import logging
-from io import BytesIO
 from typing import List
 
 import cv2
@@ -9,7 +8,6 @@ import numpy as np
 from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -19,23 +17,12 @@ MAX_IMAGE_BYTES = 10 * 1024 * 1024
 ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg", "image/webp"}
 
 
-UNEXPLORED_HSV_LOWER = np.array([0,   0,  90])
-UNEXPLORED_HSV_UPPER = np.array([30, 35, 170])
-
-
-MIN_CONTOUR_AREA_1080P = 20
-MAX_CONTOUR_AREA_FRACTION = 0.3
-
-
-MORPH_CLOSE_KERNEL = (5, 5)
-MORPH_OPEN_KERNEL  = (3, 3)
-
-
 class BoundingBox(BaseModel):
     x: float
     y: float
     width: float
     height: float
+
 
 class RoadSegment(BaseModel):
     bbox: BoundingBox
@@ -43,6 +30,7 @@ class RoadSegment(BaseModel):
     centerY: float
     pixelArea: int
     confidence: float
+
 
 class AnalysisResult(BaseModel):
     success: bool
@@ -54,13 +42,7 @@ class AnalysisResult(BaseModel):
     error: str | None = None
 
 
-app = FastAPI(
-    title="Forza Road Finder CV Service",
-    description="Computer vision microservice for detecting unexplored roads",
-    docs_url=None,
-    redoc_url=None,
-)
-
+app = FastAPI(docs_url=None, redoc_url=None)
 
 allowed_origins = os.getenv("ALLOWED_CV_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
@@ -73,8 +55,7 @@ app.add_middleware(
 
 def verify_secret(secret: str | None) -> None:
     if not INTERNAL_SECRET:
-
-        logger.warning("INTERNAL_SERVICE_SECRET not set — accepting all requests (dev mode)")
+        logger.warning("INTERNAL_SERVICE_SECRET not set")
         return
     if secret != INTERNAL_SECRET:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -84,7 +65,7 @@ def decode_image(data: bytes) -> np.ndarray:
     arr = np.frombuffer(data, dtype=np.uint8)
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img is None:
-        raise ValueError("Could not decode image. Make sure it is a valid PNG/JPEG/WebP.")
+        raise ValueError("Could not decode image.")
     return img
 
 
@@ -105,25 +86,30 @@ def find_unexplored_roads(img_bgr: np.ndarray) -> List[RoadSegment]:
     h, w = img_bgr.shape[:2]
     total_pixels = h * w
 
+    target = np.array([128, 128, 128], dtype=np.int32)
+    diff = np.abs(img_bgr.astype(np.int32) - target)
+    dist = diff.max(axis=2)
 
-    img_hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+    mask = (dist <= 18).astype(np.uint8) * 255
 
+    margin_top    = int(h * 0.07)
+    margin_bottom = int(h * 0.09)
+    margin_lr     = int(w * 0.02)
+    mask[:margin_top, :]      = 0
+    mask[h-margin_bottom:, :] = 0
+    mask[:, :margin_lr]       = 0
+    mask[:, w-margin_lr:]     = 0
 
-    mask = cv2.inRange(img_hsv, UNEXPLORED_HSV_LOWER, UNEXPLORED_HSV_UPPER)
-
-
-    kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, MORPH_CLOSE_KERNEL)
-    kernel_open  = cv2.getStructuringElement(cv2.MORPH_RECT, MORPH_OPEN_KERNEL)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel_close)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN,  kernel_open)
-
+    k_close = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    k_open  = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, k_close)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN,  k_open)
 
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-
-    scale = (w * h) / (1920 * 1080)
-    min_area = int(MIN_CONTOUR_AREA_1080P * scale)
-    max_area = int(total_pixels * MAX_CONTOUR_AREA_FRACTION)
+    scale = total_pixels / (1920 * 1080)
+    min_area = max(40, int(80 * scale))
+    max_area = int(total_pixels * 0.03)
 
     segments: List[RoadSegment] = []
 
@@ -134,6 +120,9 @@ def find_unexplored_roads(img_bgr: np.ndarray) -> List[RoadSegment]:
 
         x, y, cw, ch = cv2.boundingRect(cnt)
 
+        aspect = max(cw, ch) / max(min(cw, ch), 1)
+        if aspect < 1.5 and area < 60:
+            continue
 
         M = cv2.moments(cnt)
         if M["m00"] == 0:
@@ -142,28 +131,24 @@ def find_unexplored_roads(img_bgr: np.ndarray) -> List[RoadSegment]:
             cx = M["m10"] / M["m00"]
             cy = M["m01"] / M["m00"]
 
+        roi = mask[y:y+ch, x:x+cw]
+        confidence = round(int(np.count_nonzero(roi)) / (cw * ch), 3) if cw * ch > 0 else 0.0
 
-        roi_mask = mask[y : y + ch, x : x + cw]
-        masked_px = int(np.count_nonzero(roi_mask))
-        confidence = round(masked_px / (cw * ch), 3) if cw * ch > 0 else 0.0
-
-        segments.append(
-            RoadSegment(
-                bbox=BoundingBox(
-                    x=round(x / w, 4),
-                    y=round(y / h, 4),
-                    width=round(cw / w, 4),
-                    height=round(ch / h, 4),
-                ),
-                centerX=round(cx / w, 4),
-                centerY=round(cy / h, 4),
-                pixelArea=int(area),
-                confidence=confidence,
-            )
-        )
-
+        segments.append(RoadSegment(
+            bbox=BoundingBox(
+                x=round(x / w, 4),
+                y=round(y / h, 4),
+                width=round(cw / w, 4),
+                height=round(ch / h, 4),
+            ),
+            centerX=round(cx / w, 4),
+            centerY=round(cy / h, 4),
+            pixelArea=int(area),
+            confidence=confidence,
+        ))
 
     segments.sort(key=lambda s: s.pixelArea, reverse=True)
+    logger.info("Found %d unexplored segments (808080)", len(segments))
     return segments
 
 
@@ -179,16 +164,10 @@ async def analyze(
 ) -> AnalysisResult:
     start = time.monotonic()
 
-
     verify_secret(x_internal_secret)
 
-
     if image.content_type not in ALLOWED_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Unsupported content type: {image.content_type}",
-        )
-
+        raise HTTPException(status_code=422, detail=f"Unsupported content type: {image.content_type}")
 
     data = await image.read(MAX_IMAGE_BYTES + 1)
     if len(data) > MAX_IMAGE_BYTES:
@@ -218,11 +197,9 @@ async def analyze(
         segments = find_unexplored_roads(img_bgr)
     except Exception as exc:
         logger.exception("CV pipeline error")
-
         raise HTTPException(status_code=500, detail="Image analysis failed internally.") from exc
 
     elapsed_ms = int((time.monotonic() - start) * 1000)
-    logger.info("Found %d unexplored segments in %dms", len(segments), elapsed_ms)
 
     return AnalysisResult(
         success=True,
