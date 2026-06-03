@@ -1,5 +1,3 @@
-""""""
-
 import os
 import time
 import logging
@@ -55,6 +53,108 @@ class AnalysisResult(BaseModel):
     processingTimeMs: int
     error: str | None = None
 
+
+app = FastAPI(
+    title="Forza Road Finder CV Service",
+    description="Computer vision microservice for detecting unexplored roads",
+    docs_url=None,
+    redoc_url=None,
+)
+
+
+allowed_origins = os.getenv("ALLOWED_CV_ORIGINS", "http://localhost:3000").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_methods=["POST"],
+    allow_headers=["X-Internal-Secret", "Content-Type"],
+)
+
+
+def verify_secret(secret: str | None) -> None:
+    if not INTERNAL_SECRET:
+
+        logger.warning("INTERNAL_SERVICE_SECRET not set — accepting all requests (dev mode)")
+        return
+    if secret != INTERNAL_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def decode_image(data: bytes) -> np.ndarray:
+    arr = np.frombuffer(data, dtype=np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError("Could not decode image. Make sure it is a valid PNG/JPEG/WebP.")
+    return img
+
+
+def find_unexplored_roads(img_bgr: np.ndarray) -> List[RoadSegment]:
+    h, w = img_bgr.shape[:2]
+    total_pixels = h * w
+
+    target = np.array([128, 128, 128], dtype=np.int32)
+    diff = np.abs(img_bgr.astype(np.int32) - target)
+    dist = diff.max(axis=2)
+
+    mask = (dist <= 18).astype(np.uint8) * 255
+
+    margin_top    = int(h * 0.07)
+    margin_bottom = int(h * 0.09)
+    margin_lr     = int(w * 0.02)
+    mask[:margin_top, :]     = 0
+    mask[h-margin_bottom:, :] = 0
+    mask[:, :margin_lr]      = 0
+    mask[:, w-margin_lr:]    = 0
+
+    k_close = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    k_open  = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, k_close)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN,  k_open)
+
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    scale = total_pixels / (1920 * 1080)
+    min_area = max(40, int(80 * scale))
+    max_area = int(total_pixels * 0.03)
+
+    segments: List[RoadSegment] = []
+
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        if area < min_area or area > max_area:
+            continue
+
+        x, y, cw, ch = cv2.boundingRect(cnt)
+
+        aspect = max(cw, ch) / max(min(cw, ch), 1)
+        if aspect < 1.5 and area < 60:
+            continue
+
+        M = cv2.moments(cnt)
+        if M["m00"] == 0:
+            cx, cy = x + cw / 2, y + ch / 2
+        else:
+            cx = M["m10"] / M["m00"]
+            cy = M["m01"] / M["m00"]
+
+        roi = mask[y:y+ch, x:x+cw]
+        confidence = round(int(np.count_nonzero(roi)) / (cw * ch), 3) if cw * ch > 0 else 0.0
+
+        segments.append(RoadSegment(
+            bbox=BoundingBox(
+                x=round(x / w, 4),
+                y=round(y / h, 4),
+                width=round(cw / w, 4),
+                height=round(ch / h, 4),
+            ),
+            centerX=round(cx / w, 4),
+            centerY=round(cy / h, 4),
+            pixelArea=int(area),
+            confidence=confidence,
+        ))
+
+    segments.sort(key=lambda s: s.pixelArea, reverse=True)
+    return segments
 
 app = FastAPI(
     title="Forza Road Finder CV Service",
