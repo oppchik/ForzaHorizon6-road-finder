@@ -1,242 +1,237 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { XboxProfileResponse, AnalysisResult } from "@/types";
 import type { ScreenshotItem } from "@/app/api/screenshots/route";
 
 type Step = "input" | "profile" | "result";
 
-const GITHUB_URL = "https://github.com/oppchik/ForzaHorizon6-road-finder";
+const GITHUB = "https://github.com/oppchik/ForzaHorizon6-road-finder";
 
-export default function HomePage() {
+export default function Home() {
   const [step, setStep] = useState<Step>("input");
   const [gamertag, setGamertag] = useState("");
-  const [profileData, setProfileData] = useState<XboxProfileResponse | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [profile, setProfile] = useState<XboxProfileResponse | null>(null);
+  const [shots, setShots] = useState<ScreenshotItem[]>([]);
+  const [shotsLoading, setShotsLoading] = useState(false);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [screenshots, setScreenshots] = useState<ScreenshotItem[]>([]);
-  const [screenshotsLoading, setScreenshotsLoading] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
-  const [helpLang, setHelpLang] = useState<"en" | "ru">("en");
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpLang, setHelpLang] = useState<"en"|"ru">("en");
 
-  async function handleLookup(e: React.FormEvent) {
+  async function lookup(e: React.FormEvent) {
     e.preventDefault();
     if (!gamertag.trim()) return;
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       const res = await fetch(`/api/xbox?gamertag=${encodeURIComponent(gamertag.trim())}`);
       const data: XboxProfileResponse = await res.json();
-      if (!data.success || !data.profile) {
-        setError(data.error ?? "Gamertag not found.");
-        return;
-      }
-      setProfileData(data);
+      if (!data.success || !data.profile) { setError(data.error ?? "Not found."); return; }
+      setProfile(data);
       setStep("profile");
-      if (data.profile?.xuid) {
-        setScreenshotsLoading(true);
+      if (data.profile.xuid) {
+        setShotsLoading(true);
         fetch(`/api/screenshots?xuid=${data.profile.xuid}`)
-          .then((r) => r.json())
-          .then((s) => { 
-            if (s.success && s.screenshots?.length > 0) {
-              setScreenshots(s.screenshots.slice(0, 3)); 
-            }
-          })
+          .then(r => r.json())
+          .then(s => { if (s.success && s.screenshots?.length) setShots(s.screenshots); })
           .catch(() => {})
-          .finally(() => setScreenshotsLoading(false));
+          .finally(() => setShotsLoading(false));
       }
-    } catch {
-      setError("Network error. Please check your connection.");
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError("Network error."); }
+    finally { setLoading(false); }
   }
 
-  async function resizeImage(blob: Blob, maxWidth = 960): Promise<Blob> {
-    return new Promise((resolve) => {
+  async function resize(blob: Blob, w = 960): Promise<Blob> {
+    return new Promise(res => {
       const img = new Image();
-      const url = URL.createObjectURL(blob);
+      const u = URL.createObjectURL(blob);
       img.onload = () => {
-        const scale = Math.min(1, maxWidth / img.width);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-        URL.revokeObjectURL(url);
-        canvas.toBlob((b) => resolve(b ?? blob), "image/jpeg", 0.85);
+        const sc = Math.min(1, w / img.width);
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+        c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(u);
+        c.toBlob(b => res(b ?? blob), "image/jpeg", 0.85);
       };
-      img.src = url;
+      img.src = u;
     });
   }
 
-  async function handleScreenshotSelect(fullUrl: string) {
-    setLoading(true);
-    setError(null);
+  async function analyse(blob: Blob, preview: string) {
+    setLoading(true); setError(null);
+    setPreviewUrl(preview);
     try {
-      const proxyRes = await fetch(`/api/proxy-image?url=${encodeURIComponent(fullUrl)}`);
-      if (!proxyRes.ok) throw new Error(`Proxy ${proxyRes.status}`);
-      const blob = await proxyRes.blob();
-      if (blob.size === 0) throw new Error("Empty blob");
-      const previewUrl = URL.createObjectURL(blob);
-      setUploadedImage(previewUrl);
-      const resized = await resizeImage(blob, 960);
-      const formData = new FormData();
-      formData.append("image", resized, "xbox-screenshot.jpg");
-      const res = await fetch("/api/analyze", { method: "POST", body: formData });
-      if (!res.ok) throw new Error(`Analyze ${res.status}`);
+      const small = await resize(blob, 960);
+      const fd = new FormData();
+      fd.append("image", small, "map.jpg");
+      const res = await fetch("/api/analyze", { method: "POST", body: fd });
+      if (!res.ok) throw new Error(`${res.status}`);
       const data: AnalysisResult = await res.json();
-      if (!data.success) { 
-        setError(data.error ?? "Analysis failed."); 
-        return; 
-      }
-      setAnalysisResult(data);
+      if (!data.success) { setError(data.error ?? "Analysis failed."); return; }
+      setResult(data);
       setStep("result");
     } catch (err) {
-      setError(`Failed to load screenshot: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setLoading(false);
+      setError(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally { setLoading(false); }
+  }
+
+  async function selectShot(fullUrl: string) {
+    try {
+      const r = await fetch(`/api/proxy-image?url=${encodeURIComponent(fullUrl)}`);
+      if (!r.ok) throw new Error(`Proxy ${r.status}`);
+      const blob = await r.blob();
+      if (!blob.size) throw new Error("Empty");
+      await analyse(blob, URL.createObjectURL(blob));
+    } catch (err) {
+      setError(`Could not load screenshot: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
   function reset() {
-    setStep("input"); 
-    setGamertag(""); 
-    setProfileData(null);
-    setAnalysisResult(null); 
-    setUploadedImage(null); 
-    setError(null); 
-    setScreenshots([]);
-  }
-
-  function goBack() {
-    setStep("profile"); 
-    setAnalysisResult(null); 
-    setUploadedImage(null); 
-    setError(null);
+    setStep("input"); setGamertag(""); setProfile(null);
+    setShots([]); setResult(null); setPreviewUrl(null); setError(null);
   }
 
   return (
-    <div className="bg-gradient-main min-h-screen relative overflow-hidden flex flex-col">
-      <div className="scan-line fixed inset-0 z-0" />
-      <TopBar onGithub={() => window.open(GITHUB_URL, "_blank")} onHelp={() => setShowHelp(true)} />
-      {showHelp && <HelpModal lang={helpLang} onLangChange={setHelpLang} onClose={() => setShowHelp(false)} />}
+    <div className="page-bg" style={{ minHeight: "100vh" }}>
+      <header className="topbar">
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 20 }}>🏎️</span>
+          <span className="font-display" style={{ fontSize: "0.75rem", color: "rgba(0,200,90,0.45)", letterSpacing: "0.15em" }}>
+            FORZA ROAD FINDER
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 4 }}>
+          <button className="icon-btn" onClick={() => setHelpOpen(true)} title="Help">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </button>
+          <button className="icon-btn" onClick={() => window.open(GITHUB, "_blank")} title="GitHub">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+            </svg>
+          </button>
+        </div>
+      </header>
 
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-12 max-w-6xl mx-auto w-full">
+      {helpOpen && <HelpModal lang={helpLang} onLang={setHelpLang} onClose={() => setHelpOpen(false)} />}
+
+      <main style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 52px)", padding: "32px 16px" }}>
+
         {step === "input" && (
-          <div className="w-full max-w-md animate-fadeUp flex flex-col items-center">
-            <div className="text-center mb-12">
-              <div className="inline-flex items-center gap-3 mb-4">
-                <span className="text-4xl">🏎️</span>
-                <h1 className="font-display text-3xl font-900 text-white tracking-widest">
-                  FORZA ROAD FINDER
-                </h1>
-              </div>
-              <p className="text-xs text-[#00e666]/70 font-medium tracking-[0.3em] uppercase">
-                Forza Horizon 6
-              </p>
+          <div className="anim-0" style={{ width: "100%", maxWidth: 420 }}>
+            <div className="anim-0" style={{ textAlign: "center", marginBottom: 48 }}>
+              <h1 className="font-display" style={{ fontSize: "2.8rem", fontWeight: 700, color: "#fff", lineHeight: 1.1, marginBottom: 10 }}>
+                FORZA ROAD<br />
+                <span style={{ color: "var(--g1)" }}>FINDER</span>
+              </h1>
+              <p style={{ fontSize: "0.8rem", color: "rgba(0,200,90,0.45)", letterSpacing: "0.2em" }}>FORZA HORIZON 6</p>
             </div>
 
             {error && (
-              <div className="mb-6 w-full px-5 py-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-sm text-center">
+              <div className="anim-0" style={{ marginBottom: 16, padding: "12px 16px", borderRadius: 12, border: "1px solid rgba(255,80,80,0.3)", background: "rgba(255,50,50,0.08)", color: "#ff9999", fontSize: "0.85rem" }}>
                 {error}
               </div>
             )}
 
-            <form onSubmit={handleLookup} className="flex flex-col gap-5 w-full">
-              <div className="glow-border rounded-xl overflow-hidden bg-[#020b05]/50 backdrop-blur-md">
+            <form onSubmit={lookup} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div className="input-wrap">
                 <input
                   type="text"
                   placeholder="Enter Xbox Gamertag"
                   value={gamertag}
-                  onChange={(e) => setGamertag(e.target.value)}
+                  onChange={e => setGamertag(e.target.value)}
                   maxLength={52}
                   required
-                  className="w-full bg-transparent px-6 py-5 text-white placeholder-[#00e666]/30 outline-none font-medium text-lg text-center"
+                  style={{ width: "100%", background: "transparent", border: "none", outline: "none", padding: "14px 18px", fontSize: "1rem", color: "#fff", fontFamily: "Inter, sans-serif" }}
                 />
               </div>
-              <button type="submit" disabled={loading || !gamertag.trim()} className="btn-primary rounded-xl py-5 text-sm tracking-[0.2em] uppercase font-display">
-                {loading ? <LoadingDots /> : "FIND ROADS"}
+              <button type="submit" disabled={loading || !gamertag.trim()} className="btn">
+                {loading ? <Spinner /> : "FIND ROADS →"}
               </button>
             </form>
           </div>
         )}
 
-        {step === "profile" && profileData?.profile && (
-          <div className="w-full flex flex-col items-center gap-12 animate-fadeUp">
-            <div className="flex flex-col items-center gap-5 animate-fadeUp-1">
-              <div className="avatar-ring">
-                <div className="w-24 h-24 rounded-full overflow-hidden bg-[#002e11]">
-                  {profileData.profile.displayPicRaw ? (
-                    <img src={profileData.profile.displayPicRaw} alt="avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-4xl">👤</div>
-                  )}
+        {step === "profile" && profile?.profile && (
+          <div className="anim-0" style={{ width: "100%", maxWidth: 560, display: "flex", flexDirection: "column", alignItems: "center", gap: 36 }}>
+
+            <div className="anim-1" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+              <div className="avatar-frame">
+                <div style={{ width: 80, height: 80, borderRadius: "50%", overflow: "hidden", background: "var(--g3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32 }}>
+                  {profile.profile.displayPicRaw
+                    ? <img src={profile.profile.displayPicRaw} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : "👤"}
                 </div>
               </div>
-              <div className="text-center">
-                <p className="font-display text-white text-2xl tracking-widest">{profileData.profile.gamertag}</p>
-                <p className="text-[#00e666]/80 text-sm mt-2 font-medium">
-                  {profileData.profile.gamerscore.toLocaleString()} <span className="text-[#00e666]/40">GS</span>
+              <div style={{ textAlign: "center" }}>
+                <p className="font-display" style={{ fontSize: "1.4rem", fontWeight: 700, color: "#fff" }}>{profile.profile.gamertag}</p>
+                <p style={{ fontSize: "0.85rem", color: "rgba(0,200,90,0.55)", marginTop: 2 }}>
+                  {profile.profile.gamerscore.toLocaleString()} GS
                 </p>
               </div>
             </div>
 
+            <div className="anim-2" style={{ width: "100%" }}>
+              {shotsLoading ? (
+                <div style={{ display: "flex", justifyContent: "center", padding: 32 }}>
+                  <Spinner />
+                </div>
+              ) : shots.length > 0 ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                  {shots.map(shot => (
+                    <button
+                      key={shot.id}
+                      className="shot-card"
+                      onClick={() => selectShot(shot.fullUrl)}
+                      disabled={loading}
+                      style={{ cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1 }}
+                    >
+                      <img
+                        src={`/api/proxy-image?url=${encodeURIComponent(shot.thumbnailUrl)}`}
+                        alt=""
+                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        onError={e => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
+                      />
+                      <div className="use-label">USE THIS</div>
+                      {loading && (
+                        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3 }}>
+                          <Spinner />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ textAlign: "center", color: "rgba(0,200,90,0.35)", fontSize: "0.85rem" }}>
+                  No public screenshots found
+                </p>
+              )}
+            </div>
+
             {error && (
-              <div className="w-full max-w-md px-5 py-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-sm text-center">
+              <div style={{ width: "100%", padding: "12px 16px", borderRadius: 12, border: "1px solid rgba(255,80,80,0.3)", background: "rgba(255,50,50,0.08)", color: "#ff9999", fontSize: "0.85rem" }}>
                 {error}
               </div>
             )}
 
-            <div className="w-full max-w-5xl animate-fadeUp-2 flex flex-col items-center">
-              {screenshotsLoading ? (
-                <div className="flex justify-center py-12">
-                  <div className="w-8 h-8 border-2 border-[#00e666]/30 border-t-[#00e666] rounded-full animate-spin" />
-                </div>
-              ) : screenshots.length > 0 ? (
-                <div className="w-full flex flex-col items-center">
-                  <p className="text-[#00e666]/50 text-xs font-display tracking-[0.2em] mb-6">SELECT A SCREENSHOT TO ANALYZE</p>
-                  <div className="flex flex-wrap md:flex-nowrap justify-center items-center gap-6 w-full">
-                    {screenshots.map((shot) => (
-                      <button
-                        key={shot.id}
-                        onClick={() => handleScreenshotSelect(shot.fullUrl)}
-                        disabled={loading}
-                        className="screenshot-card w-full md:w-1/3 aspect-video bg-[#002e11]/30"
-                      >
-                        <img
-                          src={`/api/proxy-image?url=${encodeURIComponent(shot.thumbnailUrl)}`}
-                          alt={shot.gameName}
-                          className="w-full h-full object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
-                        />
-                        {loading && (
-                          <div className="absolute inset-0 bg-[#020b05]/80 flex items-center justify-center z-10 backdrop-blur-sm">
-                            <div className="w-6 h-6 border-2 border-[#00e666]/30 border-t-[#00e666] rounded-full animate-spin" />
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-[#00e666]/50 text-sm text-center">No recent Forza Horizon 6 screenshots found.</p>
-              )}
-            </div>
-
-            <button onClick={reset} className="animate-fadeUp-3 text-xs text-[#00e666]/40 hover:text-[#00e666] transition-colors tracking-widest uppercase mt-4">
-              ← Change Gamertag
+            <button onClick={reset} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(0,200,90,0.3)", fontSize: "0.75rem", letterSpacing: "0.15em", fontFamily: "Inter, sans-serif" }}>
+              ← CHANGE GAMERTAG
             </button>
           </div>
         )}
 
-        {step === "result" && analysisResult && uploadedImage && (
+        {step === "result" && result && previewUrl && (
           <ResultView
-            result={analysisResult}
-            imageUrl={uploadedImage}
+            result={result}
+            imageUrl={previewUrl}
+            onBack={() => { setStep("profile"); setResult(null); setPreviewUrl(null); setError(null); }}
             onReset={reset}
-            onGoBack={goBack}
           />
         )}
       </main>
@@ -244,155 +239,74 @@ export default function HomePage() {
   );
 }
 
-function TopBar({ onGithub, onHelp }: { onGithub: () => void; onHelp: () => void }) {
+function Spinner() {
   return (
-    <header className="relative z-20 flex items-center justify-between px-6 h-16 border-b border-[#00e666]/10 bg-[#020b05]/50 backdrop-blur-md">
-      <div className="flex items-center gap-3">
-        <span className="text-xl">🏎️</span>
-        <span className="font-display text-xs text-[#00e666]/50 tracking-widest hidden sm:block">FORZA ROAD FINDER</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onHelp}
-          className="w-10 h-10 flex items-center justify-center rounded-xl text-[#00e666]/50 hover:text-[#00e666] hover:bg-[#00e666]/10 transition-all"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-        </button>
-        <button
-          onClick={onGithub}
-          className="w-10 h-10 flex items-center justify-center rounded-xl text-[#00e666]/50 hover:text-[#00e666] hover:bg-[#00e666]/10 transition-all"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-          </svg>
-        </button>
-      </div>
-    </header>
+    <svg className="spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <circle cx="12" cy="12" r="10" strokeOpacity="0.2"/>
+      <path d="M12 2a10 10 0 0 1 10 10"/>
+    </svg>
   );
 }
 
-function HelpModal({ lang, onLangChange, onClose }: { lang: "en" | "ru"; onLangChange: (l: "en" | "ru") => void; onClose: () => void }) {
-  const content = {
+function HelpModal({ lang, onLang, onClose }: { lang: "en"|"ru"; onLang: (l: "en"|"ru") => void; onClose: () => void }) {
+  const t = {
     en: {
-      title: "How to use",
+      title: "HOW TO USE",
       steps: [
-        "Enter your Xbox Gamertag and press Find Roads",
-        "Your recent Forza Horizon 6 screenshots will appear",
-        "Tap a map screenshot to analyse it instantly",
-        "Unexplored road segments will be highlighted on the map",
-        "Use the map on your phone while playing on Xbox to find missing roads",
+        ["01", "Enter your Xbox Gamertag and press FIND ROADS"],
+        ["02", "Your last 3 Forza Horizon 6 screenshots appear automatically"],
+        ["03", "Tap a map screenshot — analysis starts instantly"],
+        ["04", "Unexplored roads are highlighted with pink boxes"],
+        ["05", "Use your phone next to your TV to navigate to missing roads"],
       ],
-      tip: "For best results, take a screenshot of the zoomed-in map in-game: Xbox button → Share → Screenshot",
+      tip: "Best result: take a screenshot of the zoomed-in map in Forza — Xbox button → Share → Screenshot. It auto-syncs to your phone.",
     },
     ru: {
-      title: "Как пользоваться",
+      title: "КАК ИСПОЛЬЗОВАТЬ",
       steps: [
-        "Введите Xbox Gamertag и нажмите Find Roads",
-        "Появятся ваши последние скриншоты из Forza Horizon 6",
-        "Нажмите на скриншот карты — анализ запустится сразу",
-        "Неисследованные участки дорог будут подсвечены на карте",
-        "Смотрите в телефон пока играете на Xbox — находите пропущенные дороги",
+        ["01", "Введите Xbox Gamertag и нажмите FIND ROADS"],
+        ["02", "Автоматически появятся ваши последние 3 скриншота FH6"],
+        ["03", "Нажмите на скриншот карты — анализ запустится сразу"],
+        ["04", "Неисследованные дороги будут подсвечены розовыми рамками"],
+        ["05", "Смотрите в телефон рядом с телевизором — едьте к нужным дорогам"],
       ],
-      tip: "Для лучшего результата сделайте скриншот приближённой карты в игре: кнопка Xbox → Поделиться → Скриншот",
+      tip: "Лучший результат: сделайте скриншот приближённой карты в игре — кнопка Xbox → Поделиться → Скриншот. Он автоматически синхронизируется на телефон.",
     },
   };
-  const c = content[lang];
+  const c = t[lang];
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" onClick={onClose}>
-      <div className="absolute inset-0 bg-[#020b05]/80 backdrop-blur-md" />
-      <div
-        className="relative w-full max-w-md card rounded-2xl p-8 glow-border animate-fadeUp"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="font-display text-[#00e666] tracking-widest text-sm uppercase">{c.title}</h2>
-          <div className="flex items-center gap-3">
-            <button onClick={() => onLangChange("en")} className={`text-xs px-3 py-1.5 rounded-lg transition-all font-medium ${lang === "en" ? "bg-[#00e666]/20 text-[#00e666]" : "text-[#00e666]/40 hover:text-[#00e666]"}`}>EN</button>
-            <button onClick={() => onLangChange("ru")} className={`text-xs px-3 py-1.5 rounded-lg transition-all font-medium ${lang === "ru" ? "bg-[#00e666]/20 text-[#00e666]" : "text-[#00e666]/40 hover:text-[#00e666]"}`}>RU</button>
-            <button onClick={onClose} className="ml-3 text-[#00e666]/40 hover:text-[#00e666] transition-colors">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <span className="font-display" style={{ fontSize: "0.8rem", color: "var(--g1)", letterSpacing: "0.15em" }}>{c.title}</span>
+          <div style={{ display: "flex", gap: 4 }}>
+            {(["en","ru"] as const).map(l => (
+              <button key={l} onClick={() => onLang(l)} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid", borderColor: lang===l ? "rgba(0,200,90,0.5)" : "transparent", background: lang===l ? "rgba(0,200,90,0.1)" : "transparent", color: lang===l ? "var(--g1)" : "rgba(0,200,90,0.3)", fontSize: "0.7rem", cursor: "pointer", fontFamily: "Inter" }}>
+                {l.toUpperCase()}
+              </button>
+            ))}
+            <button onClick={onClose} style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "rgba(0,200,90,0.3)" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
         </div>
-        <ol className="space-y-4 mb-8">
-          {c.steps.map((s, i) => (
-            <li key={i} className="flex gap-4 text-sm text-[#e8f5ee]/80 leading-relaxed">
-              <span className="font-display text-[#00e666] shrink-0 text-xs mt-0.5">{String(i + 1).padStart(2, "0")}</span>
-              <span>{s}</span>
-            </li>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 20 }}>
+          {c.steps.map(([n, s]) => (
+            <div key={n} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+              <span className="font-display" style={{ color: "var(--g1)", fontSize: "0.75rem", fontWeight: 700, minWidth: 22, marginTop: 1 }}>{n}</span>
+              <span style={{ fontSize: "0.875rem", color: "rgba(212,240,223,0.75)", lineHeight: 1.5 }}>{s}</span>
+            </div>
           ))}
-        </ol>
-        <div className="bg-[#00e666]/5 border border-[#00e666]/15 rounded-xl p-4 text-xs text-[#00e666]/70 leading-relaxed">{c.tip}</div>
+        </div>
+        <div style={{ padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(0,200,90,0.12)", background: "rgba(0,200,90,0.04)", fontSize: "0.78rem", color: "rgba(0,200,90,0.5)", lineHeight: 1.6 }}>
+          {c.tip}
+        </div>
       </div>
     </div>
   );
 }
 
-function LoadingDots() {
-  return (
-    <span className="loading-dots inline-flex gap-1">
-      <span className="inline-block w-2 h-2 bg-current rounded-full" />
-      <span className="inline-block w-2 h-2 bg-current rounded-full" />
-      <span className="inline-block w-2 h-2 bg-current rounded-full" />
-    </span>
-  );
-}
-
-function ResultView({
-  result, imageUrl, onReset, onGoBack,
-}: {
-  result: AnalysisResult; imageUrl: string; onReset: () => void; onGoBack: () => void;
-}) {
-  return (
-    <div className="w-full max-w-4xl flex flex-col items-center gap-6 animate-fadeUp">
-      <div className="w-full flex items-center justify-between px-2">
-        <div>
-          {!result.success && result.error ? (
-            <p className="font-display text-yellow-400 text-sm tracking-widest">⚠ NOT A MAP</p>
-          ) : (
-            <p className="font-display text-[#00e666] text-sm tracking-widest">
-              {result.totalUnexplored === 0 ? "✓ ALL ROADS EXPLORED" : `${result.totalUnexplored} SEGMENTS FOUND`}
-            </p>
-          )}
-        </div>
-        <span className="text-xs text-[#00e666]/40 font-mono">{result.processingTimeMs}ms</span>
-      </div>
-
-      {!result.success && result.error && (
-        <div className="w-full px-5 py-4 rounded-xl border border-yellow-500/30 bg-yellow-500/5 text-yellow-200/80 text-sm text-center">
-          {result.error}
-        </div>
-      )}
-
-      <div className="w-full card rounded-2xl overflow-hidden glow-border p-1">
-        <MapCanvas imageUrl={imageUrl} segments={result.unexploredSegments} />
-      </div>
-
-      <p className="text-center text-xs text-[#00e666]/40 tracking-wide">
-        Pink boxes = unexplored road segments · Green dots = exact centres
-      </p>
-
-      <div className="flex gap-4 w-full max-w-md mt-4">
-        <button
-          onClick={onGoBack}
-          className="flex-1 py-4 rounded-xl border border-[#00e666]/20 text-[#00e666]/80 text-sm hover:border-[#00e666]/50 hover:text-[#00e666] hover:bg-[#00e666]/5 transition-all font-display tracking-widest"
-        >
-          ← TRY ANOTHER
-        </button>
-        <button
-          onClick={onReset}
-          className="py-4 px-6 rounded-xl border border-transparent text-[#00e666]/40 hover:text-[#00e666] transition-all text-xs tracking-widest uppercase"
-        >
-          Change gamertag
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function MapCanvas({ imageUrl, segments }: { imageUrl: string; segments: import("@/types").RoadSegment[] }) {
+function ResultView({ result, imageUrl, onBack, onReset }: { result: AnalysisResult; imageUrl: string; onBack: () => void; onReset: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -404,41 +318,75 @@ function MapCanvas({ imageUrl, segments }: { imageUrl: string; segments: import(
       canvas.height = img.naturalHeight;
       const ctx = canvas.getContext("2d")!;
       ctx.drawImage(img, 0, 0);
-      for (const seg of segments) {
+      for (const seg of result.unexploredSegments) {
         const x = seg.bbox.x * img.naturalWidth;
         const y = seg.bbox.y * img.naturalHeight;
         const w = Math.max(seg.bbox.width * img.naturalWidth, 8);
         const h = Math.max(seg.bbox.height * img.naturalHeight, 8);
         ctx.strokeStyle = "#ff2d78";
-        ctx.lineWidth = Math.max(2, img.naturalWidth / 400);
+        ctx.lineWidth = Math.max(2, img.naturalWidth / 480);
         ctx.shadowColor = "#ff2d78";
         ctx.shadowBlur = 8;
         ctx.strokeRect(x, y, w, h);
-        ctx.fillStyle = "rgba(255,45,120,0.08)";
+        ctx.fillStyle = "rgba(255,45,120,0.07)";
         ctx.fillRect(x, y, w, h);
         const cx = seg.centerX * img.naturalWidth;
         const cy = seg.centerY * img.naturalHeight;
-        const r = Math.max(5, img.naturalWidth / 200);
+        const r = Math.max(4, img.naturalWidth / 220);
         ctx.shadowColor = "#39ff14";
         ctx.shadowBlur = 10;
         ctx.fillStyle = "#39ff14";
         ctx.beginPath();
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = "#000";
+        ctx.strokeStyle = "rgba(0,0,0,0.6)";
         ctx.lineWidth = 1.5;
         ctx.shadowBlur = 0;
         ctx.stroke();
       }
     };
     img.src = imageUrl;
-  }, [imageUrl, segments]);
+  }, [imageUrl, result.unexploredSegments]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="w-full block rounded-xl"
-      style={{ imageRendering: "crisp-edges" }}
-    />
+    <div className="anim-0" style={{ width: "100%", maxWidth: 700, display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          {!result.success && result.error ? (
+            <span className="tag" style={{ background: "rgba(255,180,0,0.12)", color: "#ffbb33", border: "1px solid rgba(255,180,0,0.25)" }}>⚠ NOT A MAP</span>
+          ) : result.totalUnexplored === 0 ? (
+            <span className="font-display" style={{ color: "var(--g1)", fontSize: "1.1rem" }}>✓ ALL ROADS EXPLORED</span>
+          ) : (
+            <span className="font-display" style={{ color: "#fff", fontSize: "1.1rem" }}>
+              <span style={{ color: "var(--g1)" }}>{result.totalUnexplored}</span> SEGMENTS FOUND
+            </span>
+          )}
+        </div>
+        <span style={{ fontSize: "0.7rem", color: "rgba(0,200,90,0.3)", fontFamily: "monospace" }}>{result.processingTimeMs}ms</span>
+      </div>
+
+      {!result.success && result.error && (
+        <div style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid rgba(255,180,0,0.2)", background: "rgba(255,180,0,0.06)", color: "rgba(255,220,100,0.8)", fontSize: "0.85rem" }}>
+          {result.error}
+        </div>
+      )}
+
+      <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid rgba(0,200,90,0.15)" }}>
+        <canvas ref={canvasRef} style={{ width: "100%", display: "block" }} />
+      </div>
+
+      <p style={{ textAlign: "center", fontSize: "0.72rem", color: "rgba(0,200,90,0.25)", letterSpacing: "0.05em" }}>
+        Pink boxes = unexplored road segments · Green dots = exact centres
+      </p>
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <button onClick={onBack} style={{ flex: 1, padding: "13px", borderRadius: 12, border: "1px solid rgba(0,200,90,0.2)", background: "transparent", color: "rgba(0,200,90,0.7)", cursor: "pointer", fontFamily: "Rajdhani, sans-serif", fontWeight: 700, fontSize: "0.9rem", letterSpacing: "0.08em", transition: "border-color .2s" }}>
+          ← TRY ANOTHER
+        </button>
+        <button onClick={onReset} style={{ padding: "13px 18px", borderRadius: 12, border: "1px solid rgba(0,200,90,0.08)", background: "transparent", color: "rgba(0,200,90,0.3)", cursor: "pointer", fontSize: "0.75rem", fontFamily: "Inter, sans-serif", transition: "color .2s" }}>
+          Change gamertag
+        </button>
+      </div>
+    </div>
   );
 }
