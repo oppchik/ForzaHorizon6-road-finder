@@ -54,25 +54,38 @@ def decode_image(data: bytes) -> np.ndarray:
     return img
 
 
-def highlight_unexplored(img_bgr: np.ndarray, tolerance: int = 18) -> tuple[np.ndarray, int]:
-    target = np.array([128, 128, 128], dtype=np.int32)
-    diff = np.abs(img_bgr.astype(np.int32) - target)
-    dist = diff.max(axis=2)
-    mask = dist <= tolerance
-
+def highlight_unexplored(img_bgr: np.ndarray) -> tuple[np.ndarray, int]:
     h, w = img_bgr.shape[:2]
+
+    img_f = img_bgr.astype(np.float32)
+    B, G, R = img_f[:,:,0], img_f[:,:,1], img_f[:,:,2]
+    mx = np.maximum(np.maximum(B, G), R)
+    mn = np.minimum(np.minimum(B, G), R)
+    sat = mx - mn
+    brightness = (B + G + R) / 3.0
+
+    is_neutral_grey = (sat < 28) & (np.abs(R-B) < 18) & (np.abs(G-B) < 18)
+    mask_dark  = is_neutral_grey & (brightness >= 95)  & (brightness <= 155)
+    mask_light = is_neutral_grey & (brightness > 155) & (brightness <= 210)
+    combined = mask_dark | mask_light
+
+    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    blur_large = cv2.GaussianBlur(gray, (21, 21), 0)
+    local_contrast = gray.astype(np.int16) - blur_large.astype(np.int16)
+    combined = combined & (local_contrast > 4)
+
     margin_top    = int(h * 0.07)
     margin_bottom = int(h * 0.09)
     margin_lr     = int(w * 0.02)
-    mask[:margin_top, :]      = False
-    mask[h-margin_bottom:, :] = False
-    mask[:, :margin_lr]       = False
-    mask[:, w-margin_lr:]     = False
+    combined[:margin_top, :]      = False
+    combined[h-margin_bottom:, :] = False
+    combined[:, :margin_lr]       = False
+    combined[:, w-margin_lr:]     = False
 
     result = img_bgr.copy()
-    result[mask] = [0, 255, 20]
+    result[combined] = [0, 255, 20]
 
-    count = int(np.sum(mask))
+    count = int(np.sum(combined))
     return result, count
 
 
