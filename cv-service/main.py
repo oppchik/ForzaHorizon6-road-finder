@@ -1,7 +1,8 @@
 import os
 import time
 import logging
-from typing import List
+import base64
+from typing import Tuple
 
 import cv2
 import numpy as np
@@ -15,6 +16,11 @@ logger = logging.getLogger(__name__)
 INTERNAL_SECRET = os.getenv("INTERNAL_SERVICE_SECRET", "")
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg", "image/webp"}
+
+FIND_SRGB  = np.array([0x80, 0x80, 0x80], dtype=np.float32) / 255.0
+PAINT_BGR  = np.array([20, 255, 0],        dtype=np.uint8)
+TOLERANCE  = 5.0 / 255.0
+REC601     = np.array([0.114, 0.587, 0.299], dtype=np.float32)
 
 
 class AnalysisResult(BaseModel):
@@ -54,38 +60,33 @@ def decode_image(data: bytes) -> np.ndarray:
     return img
 
 
-def highlight_unexplored(img_bgr: np.ndarray) -> tuple[np.ndarray, int]:
+def highlight_unexplored(img_bgr: np.ndarray, tolerance: float = TOLERANCE) -> Tuple[np.ndarray, int]:
+    img_rgb = img_bgr[:, :, ::-1].astype(np.float32) / 255.0
+
+    linear = img_rgb * img_rgb
+
+    find_linear = FIND_SRGB * FIND_SRGB
+
+    diff = linear - find_linear
+    dist_sq = (diff * diff * REC601).sum(axis=2)
+
+    dist_max = tolerance * tolerance * 3.0
+
     h, w = img_bgr.shape[:2]
-
-    img_f = img_bgr.astype(np.float32)
-    B, G, R = img_f[:,:,0], img_f[:,:,1], img_f[:,:,2]
-    mx = np.maximum(np.maximum(B, G), R)
-    mn = np.minimum(np.minimum(B, G), R)
-    sat = mx - mn
-    brightness = (B + G + R) / 3.0
-
-    is_neutral_grey = (sat < 28) & (np.abs(R-B) < 18) & (np.abs(G-B) < 18)
-    mask_dark  = is_neutral_grey & (brightness >= 95)  & (brightness <= 155)
-    mask_light = is_neutral_grey & (brightness > 155) & (brightness <= 210)
-    combined = mask_dark | mask_light
-
-    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-    blur_large = cv2.GaussianBlur(gray, (21, 21), 0)
-    local_contrast = gray.astype(np.int16) - blur_large.astype(np.int16)
-    combined = combined & (local_contrast > 4)
-
     margin_top    = int(h * 0.07)
     margin_bottom = int(h * 0.09)
     margin_lr     = int(w * 0.02)
-    combined[:margin_top, :]      = False
-    combined[h-margin_bottom:, :] = False
-    combined[:, :margin_lr]       = False
-    combined[:, w-margin_lr:]     = False
+
+    mask = dist_sq <= dist_max
+    mask[:margin_top, :]      = False
+    mask[h-margin_bottom:, :] = False
+    mask[:, :margin_lr]       = False
+    mask[:, w-margin_lr:]     = False
 
     result = img_bgr.copy()
-    result[combined] = [0, 255, 20]
+    result[mask] = PAINT_BGR
 
-    count = int(np.sum(combined))
+    count = int(mask.sum())
     return result, count
 
 
@@ -124,12 +125,11 @@ async def analyze(
         logger.exception("CV error")
         raise HTTPException(status_code=500, detail="Analysis failed.") from exc
 
-    _, buf = cv2.imencode(".jpg", result_img, [cv2.IMWRITE_JPEG_QUALITY, 90])
-    import base64
+    _, buf = cv2.imencode(".jpg", result_img, [cv2.IMWRITE_JPEG_QUALITY, 92])
     img_b64 = base64.b64encode(buf.tobytes()).decode("ascii")
 
     elapsed_ms = int((time.monotonic() - start) * 1000)
-    logger.info("Done: %d grey pixels highlighted in %dms", pixel_count, elapsed_ms)
+    logger.info("Done: %d grey pixels in %dms", pixel_count, elapsed_ms)
 
     return AnalysisResult(
         success=True,
