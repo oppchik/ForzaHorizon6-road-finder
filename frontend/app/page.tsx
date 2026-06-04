@@ -99,9 +99,6 @@ export default function Home() {
       <header className="topbar">
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 20 }}>🏎️</span>
-          <span className="font-display" style={{ fontSize: "0.75rem", color: "rgba(0,200,90,0.45)", letterSpacing: "0.15em" }}>
-            FORZA ROAD FINDER
-          </span>
         </div>
         <div style={{ display: "flex", gap: 4 }}>
           <button className="icon-btn" onClick={() => setHelpOpen(true)} title="Help">
@@ -159,18 +156,18 @@ export default function Home() {
         )}
 
         {step === "profile" && profile?.profile && (
-          <div className="anim-0" style={{ width: "100%", maxWidth: 560, display: "flex", flexDirection: "column", alignItems: "center", gap: 36 }}>
+          <div className="anim-0" style={{ width: "100%", maxWidth: 680, display: "flex", flexDirection: "column", alignItems: "center", gap: 36 }}>
 
             <div className="anim-1" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
               <div className="avatar-frame">
-                <div style={{ width: 80, height: 80, borderRadius: "50%", overflow: "hidden", background: "var(--g3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32 }}>
+                <div style={{ width: 108, height: 108, borderRadius: "50%", overflow: "hidden", background: "var(--g3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40 }}>
                   {profile.profile.displayPicRaw
                     ? <img src={profile.profile.displayPicRaw} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     : "👤"}
                 </div>
               </div>
               <div style={{ textAlign: "center" }}>
-                <p className="font-display" style={{ fontSize: "1.4rem", fontWeight: 700, color: "#fff" }}>{profile.profile.gamertag}</p>
+                <p className="font-display" style={{ fontSize: "1.6rem", fontWeight: 700, color: "#fff" }}>{profile.profile.gamertag}</p>
                 <p style={{ fontSize: "0.85rem", color: "rgba(0,200,90,0.55)", marginTop: 2 }}>
                   {profile.profile.gamerscore.toLocaleString()} GS
                 </p>
@@ -183,7 +180,7 @@ export default function Home() {
                   <Spinner />
                 </div>
               ) : shots.length > 0 ? (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
                   {shots.map(shot => (
                     <button
                       key={shot.id}
