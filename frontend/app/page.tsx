@@ -334,7 +334,7 @@ function ResultView({ result, onBack, onReset }: { result: AnalysisResult; onBac
         </div>
       )}
 
-      <p style={{ textAlign: "center", fontSize: "0.72rem", color: "rgba(0,200,90,0.25)", letterSpacing: "0.05em" }}>
+      <p style={{ textAlign: "center", fontSize: "0.82rem", color: "rgba(0,200,90,0.6)", letterSpacing: "0.05em" }}>
         Green = unexplored roads
       </p>
 
@@ -342,7 +342,7 @@ function ResultView({ result, onBack, onReset }: { result: AnalysisResult; onBac
         <button onClick={onBack} style={{ flex: 1, padding: "13px", borderRadius: 12, border: "1px solid rgba(0,200,90,0.2)", background: "transparent", color: "rgba(0,200,90,0.7)", cursor: "pointer", fontFamily: "Rajdhani, sans-serif", fontWeight: 700, fontSize: "0.9rem", letterSpacing: "0.08em" }}>
           ← TRY ANOTHER
         </button>
-        <button onClick={onReset} style={{ padding: "13px 18px", borderRadius: 12, border: "1px solid rgba(0,200,90,0.08)", background: "transparent", color: "rgba(0,200,90,0.3)", cursor: "pointer", fontSize: "0.75rem", fontFamily: "Inter, sans-serif" }}>
+        <button onClick={onReset} style={{ padding: "13px 18px", borderRadius: 12, border: "1px solid rgba(0,200,90,0.2)", background: "transparent", color: "rgba(0,200,90,0.55)", cursor: "pointer", fontSize: "0.85rem", fontFamily: "Inter, sans-serif" }}>
           Change gamertag
         </button>
       </div>
