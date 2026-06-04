@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import type { XboxProfileResponse, AnalysisResult } from "@/types";
 import type { ScreenshotItem } from "@/app/api/screenshots/route";
 
@@ -229,7 +229,6 @@ export default function Home() {
         {step === "result" && result && previewUrl && (
           <ResultView
             result={result}
-            imageUrl={previewUrl}
             onBack={() => { setStep("profile"); setResult(null); setPreviewUrl(null); setError(null); }}
             onReset={reset}
           />
@@ -306,59 +305,18 @@ function HelpModal({ lang, onLang, onClose }: { lang: "en"|"ru"; onLang: (l: "en
   );
 }
 
-function ResultView({ result, imageUrl, onBack, onReset }: { result: AnalysisResult; imageUrl: string; onBack: () => void; onReset: () => void }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(img, 0, 0);
-      for (const seg of result.unexploredSegments) {
-        const x = seg.bbox.x * img.naturalWidth;
-        const y = seg.bbox.y * img.naturalHeight;
-        const w = Math.max(seg.bbox.width * img.naturalWidth, 8);
-        const h = Math.max(seg.bbox.height * img.naturalHeight, 8);
-        ctx.strokeStyle = "#ff2d78";
-        ctx.lineWidth = Math.max(2, img.naturalWidth / 480);
-        ctx.shadowColor = "#ff2d78";
-        ctx.shadowBlur = 8;
-        ctx.strokeRect(x, y, w, h);
-        ctx.fillStyle = "rgba(255,45,120,0.07)";
-        ctx.fillRect(x, y, w, h);
-        const cx = seg.centerX * img.naturalWidth;
-        const cy = seg.centerY * img.naturalHeight;
-        const r = Math.max(4, img.naturalWidth / 220);
-        ctx.shadowColor = "#39ff14";
-        ctx.shadowBlur = 10;
-        ctx.fillStyle = "#39ff14";
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "rgba(0,0,0,0.6)";
-        ctx.lineWidth = 1.5;
-        ctx.shadowBlur = 0;
-        ctx.stroke();
-      }
-    };
-    img.src = imageUrl;
-  }, [imageUrl, result.unexploredSegments]);
-
+function ResultView({ result, onBack, onReset }: { result: AnalysisResult; onBack: () => void; onReset: () => void }) {
   return (
     <div className="anim-0" style={{ width: "100%", maxWidth: 700, display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           {!result.success && result.error ? (
-            <span className="tag" style={{ background: "rgba(255,180,0,0.12)", color: "#ffbb33", border: "1px solid rgba(255,180,0,0.25)" }}>⚠ NOT A MAP</span>
+            <span className="tag" style={{ background: "rgba(255,180,0,0.12)", color: "#ffbb33", border: "1px solid rgba(255,180,0,0.25)" }}>⚠ ERROR</span>
           ) : result.totalUnexplored === 0 ? (
-            <span className="font-display" style={{ color: "var(--g1)", fontSize: "1.1rem" }}>✓ ALL ROADS EXPLORED</span>
+            <span className="font-display" style={{ color: "var(--g1)", fontSize: "1.1rem" }}>✓ NO UNEXPLORED ROADS</span>
           ) : (
             <span className="font-display" style={{ color: "#fff", fontSize: "1.1rem" }}>
-              <span style={{ color: "var(--g1)" }}>{result.totalUnexplored}</span> SEGMENTS FOUND
+              UNEXPLORED ROADS <span style={{ color: "var(--g1)" }}>HIGHLIGHTED</span>
             </span>
           )}
         </div>
@@ -371,19 +329,25 @@ function ResultView({ result, imageUrl, onBack, onReset }: { result: AnalysisRes
         </div>
       )}
 
-      <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid rgba(0,200,90,0.15)" }}>
-        <canvas ref={canvasRef} style={{ width: "100%", display: "block" }} />
-      </div>
+      {result.imageBase64 && (
+        <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid rgba(0,200,90,0.15)" }}>
+          <img
+            src={`data:image/jpeg;base64,${result.imageBase64}`}
+            alt="Map with highlighted roads"
+            style={{ width: "100%", display: "block" }}
+          />
+        </div>
+      )}
 
       <p style={{ textAlign: "center", fontSize: "0.72rem", color: "rgba(0,200,90,0.25)", letterSpacing: "0.05em" }}>
-        Pink boxes = unexplored road segments · Green dots = exact centres
+        Green = unexplored roads
       </p>
 
       <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={onBack} style={{ flex: 1, padding: "13px", borderRadius: 12, border: "1px solid rgba(0,200,90,0.2)", background: "transparent", color: "rgba(0,200,90,0.7)", cursor: "pointer", fontFamily: "Rajdhani, sans-serif", fontWeight: 700, fontSize: "0.9rem", letterSpacing: "0.08em", transition: "border-color .2s" }}>
+        <button onClick={onBack} style={{ flex: 1, padding: "13px", borderRadius: 12, border: "1px solid rgba(0,200,90,0.2)", background: "transparent", color: "rgba(0,200,90,0.7)", cursor: "pointer", fontFamily: "Rajdhani, sans-serif", fontWeight: 700, fontSize: "0.9rem", letterSpacing: "0.08em" }}>
           ← TRY ANOTHER
         </button>
-        <button onClick={onReset} style={{ padding: "13px 18px", borderRadius: 12, border: "1px solid rgba(0,200,90,0.08)", background: "transparent", color: "rgba(0,200,90,0.3)", cursor: "pointer", fontSize: "0.75rem", fontFamily: "Inter, sans-serif", transition: "color .2s" }}>
+        <button onClick={onReset} style={{ padding: "13px 18px", borderRadius: 12, border: "1px solid rgba(0,200,90,0.08)", background: "transparent", color: "rgba(0,200,90,0.3)", cursor: "pointer", fontSize: "0.75rem", fontFamily: "Inter, sans-serif" }}>
           Change gamertag
         </button>
       </div>
