@@ -97,7 +97,7 @@ export default function Home() {
         <div />
         <div style={{ display: "flex", gap: 6 }}>
           <button className="icon-btn" onClick={() => setHelpOpen(true)} title="Help">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-question-mark-icon lucide-circle-question-mark"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
               <circle cx="12" cy="12" r="10"/>
               <line x1="12" y1="8" x2="12" y2="12"/>
               <line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -348,7 +348,7 @@ function HelpModal({ lang, onLang, onClose }: { lang: "en"|"ru"; onLang: (l: "en
         ["04", "Unexplored roads are highlighted in green"],
         ["05", "Use your phone next to your TV to navigate to missing roads"],
       ],
-      tip: "For best results, take a screenshot of a zoomed-in map in-game without race markers or other activities, and make sure the screenshots are sent to the XBOX network.",
+      tip: "Best result: take a screenshot of the zoomed-in map in Forza — Xbox button → Share → Screenshot. It auto-syncs to your phone.",
     },
     ru: {
       title: "КАК ИСПОЛЬЗОВАТЬ",
@@ -359,7 +359,7 @@ function HelpModal({ lang, onLang, onClose }: { lang: "en"|"ru"; onLang: (l: "en
         ["04", "Неисследованные дороги подсветятся зелёным"],
         ["05", "Смотрите в телефон рядом с телевизором — едьте к нужным дорогам"],
       ],
-      tip: "Для лучшего результата: сделайте скриншот приближённой карты в игре без маркеров гонок и прочих активностей, а также убедитесь, что скриншоты отправляются в сеть XBOX",
+      tip: "Лучший результат: сделайте скриншот приближённой карты в игре — кнопка Xbox → Поделиться → Скриншот. Он автоматически синхронизируется на телефон.",
     },
   };
   const c = t[lang];
