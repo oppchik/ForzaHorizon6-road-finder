@@ -29,12 +29,11 @@ function setCache(gamertag: string, data: XboxProfileResponse): void {
     expiresAt: Date.now() + CACHE_TTL_MS,
   });
 }
-
 setInterval(() => {
   const now = Date.now();
-  for (const [key, entry] of profileCache.entries()) {
+  Array.from(profileCache.entries()).forEach(([key, entry]) => {
     if (now > entry.expiresAt) profileCache.delete(key);
-  }
+  });
 }, 60_000);
 
 function openxblHeaders() {
@@ -107,14 +106,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     if (!profileData) {
       return errorResponse("Gamertag not found. Check spelling and try again.", 404);
     }
-
         console.log("[xbox] profileData keys:", Object.keys(profileData));
 
     const settings: Record<string, string> = {};
     for (const s of (profileData.settings as { id: string; value: string }[]) ?? []) {
       settings[s.id] = s.value;
     }
-
     const profile = {
       gamertag: settings["Gamertag"] ?? (profileData.gamertag as string) ?? gamertag,
       gamerscore: parseInt(settings["Gamerscore"] ?? String(profileData.gamerscore ?? "0"), 10),
