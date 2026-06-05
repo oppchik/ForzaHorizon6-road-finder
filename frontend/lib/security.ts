@@ -1,32 +1,14 @@
-/**
- * Security utilities for Forza Road Finder
- *
- * Covers:
- * - In-memory rate limiting (IP-based, per endpoint)
- * - Input sanitization and validation
- * - File upload validation
- * - CORS helpers
- */
-
 import { NextRequest, NextResponse } from "next/server";
-
-// ---------------------------------------------------------------------------
-// Rate Limiter
-// ---------------------------------------------------------------------------
 
 interface RateLimitEntry {
   count: number;
   resetAt: number;
 }
 
-// Single in-memory store per serverless instance.
-// For multi-instance production use, swap this for an Upstash Redis client.
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
 export interface RateLimitConfig {
-  /** Maximum requests allowed in the window */
   limit: number;
-  /** Window size in seconds */
   windowSeconds: number;
 }
 
@@ -35,9 +17,6 @@ const DEFAULT_CONFIGS: Record<string, RateLimitConfig> = {
   "/api/analyze": { limit: 10, windowSeconds: 60 },
 };
 
-/**
- * Returns null if the request is allowed, or a 429 NextResponse if rate-limited.
- */
 export function rateLimit(
   req: NextRequest,
   endpoint: string,
@@ -81,25 +60,14 @@ export function rateLimit(
   return null;
 }
 
-// Periodically purge expired entries (runs on every cold start)
 setInterval(() => {
   const now = Date.now();
-  for (const [key, entry] of rateLimitStore.entries()) {
+  Array.from(rateLimitStore.entries()).forEach(([key, entry]) => {
     if (now > entry.resetAt) rateLimitStore.delete(key);
-  }
+  });
 }, 60_000);
 
-// ---------------------------------------------------------------------------
-// Gamertag Validation
-// ---------------------------------------------------------------------------
-
-/**
- * Xbox Gamertag rules:
- * - 1–15 characters (classic) or up to 52 with suffix (#1234)
- * - Letters, digits, spaces (classic) or Unicode letters (modern)
- * - We allow the modern format but sanitise aggressively.
- */
-const GAMERTAG_RE = /^[\p{L}\p{N} '_-]{1,52}$/u;
+const GAMERTAG_RE = /^[\w '\-]{1,52}$/;
 const GAMERTAG_MAX_LEN = 52;
 
 export function validateGamertag(raw: unknown): string | null {
@@ -110,15 +78,11 @@ export function validateGamertag(raw: unknown): string | null {
   return trimmed;
 }
 
-// ---------------------------------------------------------------------------
-// Image Upload Validation
-// ---------------------------------------------------------------------------
-
 export const IMAGE_CONFIG = {
-  maxFileSizeBytes: 10 * 1024 * 1024, // 10 MB
+  maxFileSizeBytes: 10 * 1024 * 1024, 
   allowedMimeTypes: ["image/png", "image/jpeg", "image/webp"] as const,
   minDimension: 100,
-  maxDimension: 7680, // 8K
+  maxDimension: 7680, 
 } as const;
 
 export type AllowedMimeType = (typeof IMAGE_CONFIG.allowedMimeTypes)[number];
@@ -130,10 +94,6 @@ export interface ImageValidationResult {
   sizeBytes?: number;
 }
 
-/**
- * Validates a raw Buffer/Uint8Array from a file upload.
- * Checks magic bytes (not just Content-Type) to prevent MIME spoofing.
- */
 export function validateImageBuffer(buf: Uint8Array): ImageValidationResult {
   if (buf.byteLength > IMAGE_CONFIG.maxFileSizeBytes) {
     return { ok: false, error: "File too large. Maximum size is 10 MB." };
@@ -148,15 +108,12 @@ export function validateImageBuffer(buf: Uint8Array): ImageValidationResult {
 }
 
 function detectMimeType(buf: Uint8Array): AllowedMimeType | null {
-  // PNG: 89 50 4E 47
   if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
     return "image/png";
   }
-  // JPEG: FF D8 FF
   if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
     return "image/jpeg";
   }
-  // WebP: 52 49 46 46 __ __ __ __ 57 45 42 50
   if (
     buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
     buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
@@ -165,10 +122,6 @@ function detectMimeType(buf: Uint8Array): AllowedMimeType | null {
   }
   return null;
 }
-
-// ---------------------------------------------------------------------------
-// CORS helpers
-// ---------------------------------------------------------------------------
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "")
   .split(",")
@@ -186,10 +139,6 @@ export function getCorsHeaders(origin: string | null): Record<string, string> {
     "Access-Control-Max-Age": "86400",
   };
 }
-
-// ---------------------------------------------------------------------------
-// Generic error response helper
-// ---------------------------------------------------------------------------
 
 export function errorResponse(
   message: string,
