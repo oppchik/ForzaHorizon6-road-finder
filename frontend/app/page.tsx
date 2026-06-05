@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { XboxProfileResponse, AnalysisResult } from "@/types";
 import type { ScreenshotItem } from "@/app/api/screenshots/route";
 
 type Step = "input" | "profile" | "result";
-
 const GITHUB = "https://github.com/oppchik/ForzaHorizon6-road-finder";
 
 export default function Home() {
@@ -15,7 +14,6 @@ export default function Home() {
   const [shots, setShots] = useState<ScreenshotItem[]>([]);
   const [shotsLoading, setShotsLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -59,9 +57,8 @@ export default function Home() {
     });
   }
 
-  async function analyse(blob: Blob, preview: string) {
+  async function analyse(blob: Blob) {
     setLoading(true); setError(null);
-    setPreviewUrl(preview);
     try {
       const small = await resize(blob, 960);
       const fd = new FormData();
@@ -83,7 +80,7 @@ export default function Home() {
       if (!r.ok) throw new Error(`Proxy ${r.status}`);
       const blob = await r.blob();
       if (!blob.size) throw new Error("Empty");
-      await analyse(blob, URL.createObjectURL(blob));
+      await analyse(blob);
     } catch (err) {
       setError(`Could not load screenshot: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -91,23 +88,23 @@ export default function Home() {
 
   function reset() {
     setStep("input"); setGamertag(""); setProfile(null);
-    setShots([]); setResult(null); setPreviewUrl(null); setError(null);
+    setShots([]); setResult(null); setError(null);
   }
 
   return (
     <div className="page-bg" style={{ minHeight: "100vh" }}>
       <header className="topbar">
-<div />
-        <div style={{ display: "flex", gap: 4 }}>
+        <div />
+        <div style={{ display: "flex", gap: 6 }}>
           <button className="icon-btn" onClick={() => setHelpOpen(true)} title="Help">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-question-mark-icon lucide-circle-question-mark"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
               <circle cx="12" cy="12" r="10"/>
               <line x1="12" y1="8" x2="12" y2="12"/>
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
           </button>
           <button className="icon-btn" onClick={() => window.open(GITHUB, "_blank")} title="GitHub">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
             </svg>
           </button>
@@ -119,66 +116,62 @@ export default function Home() {
       <main style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 52px)", padding: "32px 16px" }}>
 
         {step === "input" && (
-          <div className="anim-0" style={{ width: "100%", maxWidth: 420 }}>
-            <div className="anim-0" style={{ textAlign: "center", marginBottom: 48 }}>
-              <h1 className="font-display" style={{ fontSize: "2.8rem", fontWeight: 700, color: "#fff", lineHeight: 1.1, marginBottom: 10 }}>
-                FORZA ROAD<br />
-                <span style={{ color: "var(--g1)" }}>FINDER</span>
-              </h1>
-              <p style={{ fontSize: "0.8rem", color: "rgba(0,200,90,0.45)", letterSpacing: "0.2em" }}>FORZA HORIZON 6</p>
-            </div>
-
-            {error && (
-              <div className="anim-0" style={{ marginBottom: 16, padding: "12px 16px", borderRadius: 12, border: "1px solid rgba(255,80,80,0.3)", background: "rgba(255,50,50,0.08)", color: "#ff9999", fontSize: "0.85rem" }}>
-                {error}
+          <div className="anim-0" style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
+            <RaceTrackBorder>
+              <div style={{ textAlign: "center", marginBottom: 40 }}>
+                <h1 className="font-display" style={{ fontSize: "3rem", fontWeight: 700, color: "#fff", lineHeight: 1.1, marginBottom: 10 }}>
+                  FORZA ROAD<br />
+                  <span style={{ color: "var(--g1)" }}>FINDER</span>
+                </h1>
+                <p style={{ fontSize: "0.75rem", color: "rgba(0,200,90,0.45)", letterSpacing: "0.22em" }}>FORZA HORIZON 6</p>
               </div>
-            )}
 
-            <form onSubmit={lookup} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div className="input-wrap">
-                <input
-                  type="text"
-                  placeholder="Enter Xbox Gamertag"
-                  value={gamertag}
-                  onChange={e => setGamertag(e.target.value)}
-                  maxLength={52}
-                  required
-                  style={{ width: "100%", background: "transparent", border: "none", outline: "none", padding: "14px 18px", fontSize: "1rem", color: "#fff", fontFamily: "Inter, sans-serif" }}
-                />
-              </div>
-              <button type="submit" disabled={loading || !gamertag.trim()} className="btn">
-                {loading ? <Spinner /> : "FIND ROADS →"}
-              </button>
-            </form>
+              {error && (
+                <div style={{ marginBottom: 16, padding: "12px 16px", borderRadius: 12, border: "1px solid rgba(255,80,80,0.3)", background: "rgba(255,50,50,0.08)", color: "#ff9999", fontSize: "0.85rem", width: "100%" }}>
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={lookup} style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
+                <div className="input-wrap">
+                  <input
+                    type="text"
+                    placeholder="Enter Xbox Gamertag"
+                    value={gamertag}
+                    onChange={e => setGamertag(e.target.value)}
+                    maxLength={52}
+                    required
+                    style={{ width: "100%", background: "transparent", border: "none", outline: "none", padding: "14px 18px", fontSize: "1rem", color: "#fff", fontFamily: "Inter, sans-serif" }}
+                  />
+                </div>
+                <button type="submit" disabled={loading || !gamertag.trim()} className="btn">
+                  {loading ? <Spinner /> : "FIND ROADS →"}
+                </button>
+              </form>
+            </RaceTrackBorder>
           </div>
         )}
 
         {step === "profile" && profile?.profile && (
-          <div className="anim-0" style={{ width: "100%", maxWidth: 800, display: "flex", flexDirection: "column", alignItems: "center", gap: 40 }}>
+          <div className="anim-0" style={{ width: "100%", maxWidth: 900, display: "flex", flexDirection: "column", alignItems: "center", gap: 32 }}>
 
-            <div className="anim-1" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+            <div className="anim-1" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginTop: 8 }}>
               <div className="avatar-frame">
-                <div style={{ width: 120, height: 120, borderRadius: "50%", overflow: "hidden", background: "var(--g3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44 }}>
+                <div style={{ width: 130, height: 130, borderRadius: "50%", overflow: "hidden", background: "var(--g3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 48 }}>
                   {profile.profile.displayPicRaw
                     ? <img src={profile.profile.displayPicRaw} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     : "👤"}
                 </div>
               </div>
-              <div style={{ textAlign: "center" }}>
-                <p className="font-display" style={{ fontSize: "2rem", fontWeight: 700, color: "#fff", marginTop: 4 }}>{profile.profile.gamertag}</p>
-                <p style={{ fontSize: "1rem", color: "rgba(0,200,90,0.6)", marginTop: 4 }}>
-                  {profile.profile.gamerscore.toLocaleString()} GS
-                </p>
-              </div>
+              <p className="font-display" style={{ fontSize: "2.2rem", fontWeight: 700, color: "#fff", marginTop: 6 }}>{profile.profile.gamertag}</p>
+              <p style={{ fontSize: "1.1rem", color: "rgba(0,200,90,0.6)" }}>{profile.profile.gamerscore.toLocaleString()} GS</p>
             </div>
 
             <div className="anim-2" style={{ width: "100%" }}>
               {shotsLoading ? (
-                <div style={{ display: "flex", justifyContent: "center", padding: 32 }}>
-                  <Spinner />
-                </div>
+                <div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner /></div>
               ) : shots.length > 0 ? (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16, width: "100%" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 18, width: "100%" }}>
                   {shots.map(shot => (
                     <button
                       key={shot.id}
@@ -203,9 +196,7 @@ export default function Home() {
                   ))}
                 </div>
               ) : (
-                <p style={{ textAlign: "center", color: "rgba(0,200,90,0.35)", fontSize: "0.85rem" }}>
-                  No public screenshots found
-                </p>
+                <p style={{ textAlign: "center", color: "rgba(0,200,90,0.35)", fontSize: "0.85rem" }}>No public screenshots found</p>
               )}
             </div>
 
@@ -215,20 +206,124 @@ export default function Home() {
               </div>
             )}
 
-            <button onClick={reset} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(0,200,90,0.3)", fontSize: "0.75rem", letterSpacing: "0.15em", fontFamily: "Inter, sans-serif" }}>
+            <button onClick={reset} style={{ padding: "10px 28px", borderRadius: 10, border: "1px solid rgba(0,200,90,0.25)", background: "transparent", cursor: "pointer", color: "rgba(0,200,90,0.5)", fontSize: "0.75rem", letterSpacing: "0.15em", fontFamily: "Rajdhani, sans-serif", fontWeight: 600, transition: "border-color .2s, color .2s" }}>
               ← CHANGE GAMERTAG
             </button>
           </div>
         )}
 
-        {step === "result" && result && previewUrl && (
+        {step === "result" && result && (
           <ResultView
             result={result}
-            onBack={() => { setStep("profile"); setResult(null); setPreviewUrl(null); setError(null); }}
+            onBack={() => { setStep("profile"); setResult(null); setError(null); }}
             onReset={reset}
           />
         )}
       </main>
+    </div>
+  );
+}
+
+function RaceTrackBorder({ children }: { children: React.ReactNode }) {
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    const W = 480, H = 380, R = 18;
+    const perim = 2 * (W - 2*R) + 2 * (H - 2*R) + 2 * Math.PI * R;
+    const TRAIL = perim * 0.18;
+    const SPEED = perim / 220;
+
+    let pos = 0;
+    let raf: number;
+
+    const trail = svg.querySelector<SVGPathElement>("#trail")!;
+    const car   = svg.querySelector<SVGCircleElement>("#car")!;
+
+    function pointAt(t: number): [number, number] {
+      t = ((t % perim) + perim) % perim;
+      const top    = W - 2*R;
+      const right  = H - 2*R;
+      const bottom = W - 2*R;
+      const left   = H - 2*R;
+      if (t < top)    return [W - R - t, R];
+      t -= top;
+      if (t < right)  return [R + (R - R * Math.cos(Math.PI/2 * (t/R < 1 ? t/R : 1))), R + (t < R ? R * Math.sin(Math.PI/2 * t/R) : t)];
+
+      const segments = [
+        { len: top,    fn: (s: number): [number,number] => [W - R - s, R] },
+        { len: Math.PI/2*R, fn: (s: number): [number,number] => [R + R*Math.cos(Math.PI/2 + Math.PI/2*(s/(Math.PI/2*R))), R - R*Math.sin(Math.PI/2 + Math.PI/2*(s/(Math.PI/2*R)))] },
+        { len: right,  fn: (s: number): [number,number] => [R, R + s] },
+        { len: Math.PI/2*R, fn: (s: number): [number,number] => [R - R*Math.cos(Math.PI/2*(s/(Math.PI/2*R))), H - R + R*Math.sin(Math.PI - Math.PI/2*(s/(Math.PI/2*R)))] },
+        { len: bottom, fn: (s: number): [number,number] => [R + s, H - R] },
+        { len: Math.PI/2*R, fn: (s: number): [number,number] => [W - R + R*Math.sin(Math.PI/2*(s/(Math.PI/2*R))), H - R + R*Math.cos(Math.PI/2*(s/(Math.PI/2*R)))] },
+        { len: left,   fn: (s: number): [number,number] => [W - R, H - R - s] },
+        { len: Math.PI/2*R, fn: (s: number): [number,number] => [W - R + R*Math.cos(Math.PI - Math.PI/2*(s/(Math.PI/2*R))), R + R*Math.sin(Math.PI - Math.PI/2*(s/(Math.PI/2*R)))] },
+      ];
+
+      let acc = 0;
+      for (const seg of segments) {
+        if (t < acc + seg.len) return seg.fn(t - acc);
+        acc += seg.len;
+      }
+      return [W - R, R];
+    }
+
+    const pathEl = svg.querySelector<SVGPathElement>("#track-path")!;
+    const totalLen = pathEl.getTotalLength();
+
+    function tick() {
+      pos = (pos + SPEED) % totalLen;
+      const headPt = pathEl.getPointAtLength(pos);
+      car.setAttribute("cx", String(headPt.x));
+      car.setAttribute("cy", String(headPt.y));
+
+      const trailLen = totalLen * 0.18;
+      const tailPos  = (pos - trailLen + totalLen) % totalLen;
+      const steps    = 60;
+      let d = `M ${headPt.x} ${headPt.y}`;
+      for (let i = 1; i <= steps; i++) {
+        const p = (pos - (trailLen * i / steps) + totalLen) % totalLen;
+        const pt = pathEl.getPointAtLength(p);
+        d += ` L ${pt.x} ${pt.y}`;
+      }
+      trail.setAttribute("d", d);
+
+      raf = requestAnimationFrame(tick);
+    }
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const W = 480, H = 380, R = 18;
+  const d = `M ${W-R} ${R} A ${R} ${R} 0 0 0 ${R} ${R} L ${R} ${H-R} A ${R} ${R} 0 0 0 ${W-R} ${H-R} Z`;
+  const rectPath = `M ${W-R},${R} L ${R},${R} A ${R},${R} 0 0 0 0,${R+R} L 0,${H-R} A ${R},${R} 0 0 0 ${R},${H} L ${W-R},${H} A ${R},${R} 0 0 0 ${W},${H-R} L ${W},${R+R} A ${R},${R} 0 0 0 ${W-R},${R} Z`;
+
+  return (
+    <div style={{ position: "relative", width: W, height: H }}>
+      <svg
+        ref={svgRef}
+        width={W} height={H}
+        style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+        viewBox={`0 0 ${W} ${H}`}
+      >
+        <path id="track-path" d={rectPath} fill="none" stroke="transparent" strokeWidth="0" />
+        <path d={rectPath} fill="none" stroke="rgba(0,200,90,0.15)" strokeWidth="1.5" />
+        <path id="trail" d="" fill="none" stroke="url(#trailGrad)" strokeWidth="2.5" strokeLinecap="round" />
+        <circle id="car" cx="0" cy="0" r="4" fill="#00ff55" style={{ filter: "drop-shadow(0 0 6px #00ff55)" }} />
+        <defs>
+          <linearGradient id="trailGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#00ff55" stopOpacity="0" />
+            <stop offset="100%" stopColor="#00ff55" stopOpacity="0.9" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 48px" }}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -250,10 +345,10 @@ function HelpModal({ lang, onLang, onClose }: { lang: "en"|"ru"; onLang: (l: "en
         ["01", "Enter your Xbox Gamertag and press FIND ROADS"],
         ["02", "Your last 3 Forza Horizon 6 screenshots appear automatically"],
         ["03", "Tap a map screenshot — analysis starts instantly"],
-        ["04", "Unexplored roads are highlighted with pink boxes"],
+        ["04", "Unexplored roads are highlighted in green"],
         ["05", "Use your phone next to your TV to navigate to missing roads"],
       ],
-      tip: "Best result: take a screenshot of the zoomed-in map in Forza — Xbox button → Share → Screenshot. It auto-syncs to your phone.",
+      tip: "For best results, take a screenshot of a zoomed-in map in-game without race markers or other activities, and make sure the screenshots are sent to the XBOX network.",
     },
     ru: {
       title: "КАК ИСПОЛЬЗОВАТЬ",
@@ -261,10 +356,10 @@ function HelpModal({ lang, onLang, onClose }: { lang: "en"|"ru"; onLang: (l: "en
         ["01", "Введите Xbox Gamertag и нажмите FIND ROADS"],
         ["02", "Автоматически появятся ваши последние 3 скриншота FH6"],
         ["03", "Нажмите на скриншот карты — анализ запустится сразу"],
-        ["04", "Неисследованные дороги будут подсвечены розовыми рамками"],
+        ["04", "Неисследованные дороги подсветятся зелёным"],
         ["05", "Смотрите в телефон рядом с телевизором — едьте к нужным дорогам"],
       ],
-      tip: "Лучший результат: сделайте скриншот приближённой карты в игре — кнопка Xbox → Поделиться → Скриншот. Он автоматически синхронизируется на телефон.",
+      tip: "Для лучшего результата: сделайте скриншот приближённой карты в игре без маркеров гонок и прочих активностей, а также убедитесь, что скриншоты отправляются в сеть XBOX",
     },
   };
   const c = t[lang];
@@ -302,30 +397,16 @@ function HelpModal({ lang, onLang, onClose }: { lang: "en"|"ru"; onLang: (l: "en
 
 function ResultView({ result, onBack, onReset }: { result: AnalysisResult; onBack: () => void; onReset: () => void }) {
   return (
-    <div className="anim-0" style={{ width: "100%", maxWidth: 700, display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="anim-0" style={{ width: "100%", maxWidth: 960, display: "flex", flexDirection: "column", gap: 18 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
-          {!result.success && result.error ? (
-            <span className="tag" style={{ background: "rgba(255,180,0,0.12)", color: "#ffbb33", border: "1px solid rgba(255,180,0,0.25)" }}>⚠ ERROR</span>
-          ) : result.totalUnexplored === 0 ? (
-            <span className="font-display" style={{ color: "var(--g1)", fontSize: "1.1rem" }}>✓ NO UNEXPLORED ROADS</span>
-          ) : (
-            <span className="font-display" style={{ color: "#fff", fontSize: "1.1rem" }}>
-              UNEXPLORED ROADS <span style={{ color: "var(--g1)" }}>HIGHLIGHTED</span>
-            </span>
-          )}
-        </div>
-        <span style={{ fontSize: "0.7rem", color: "rgba(0,200,90,0.3)", fontFamily: "monospace" }}>{result.processingTimeMs}ms</span>
+        <span className="font-display" style={{ color: "#fff", fontSize: "1.2rem" }}>
+          UNEXPLORED ROADS <span style={{ color: "var(--g1)" }}>HIGHLIGHTED</span>
+        </span>
+        <span style={{ fontSize: "0.7rem", color: "rgba(0,200,90,0.35)", fontFamily: "monospace" }}>{result.processingTimeMs}ms</span>
       </div>
 
-      {!result.success && result.error && (
-        <div style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid rgba(255,180,0,0.2)", background: "rgba(255,180,0,0.06)", color: "rgba(255,220,100,0.8)", fontSize: "0.85rem" }}>
-          {result.error}
-        </div>
-      )}
-
       {result.imageBase64 && (
-        <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid rgba(0,200,90,0.15)" }}>
+        <div style={{ borderRadius: 18, overflow: "hidden", border: "1px solid rgba(0,200,90,0.2)", boxShadow: "0 0 40px rgba(0,200,90,0.08)" }}>
           <img
             src={`data:image/jpeg;base64,${result.imageBase64}`}
             alt="Map with highlighted roads"
@@ -334,15 +415,15 @@ function ResultView({ result, onBack, onReset }: { result: AnalysisResult; onBac
         </div>
       )}
 
-      <p style={{ textAlign: "center", fontSize: "0.82rem", color: "rgba(0,200,90,0.6)", letterSpacing: "0.05em" }}>
+      <p style={{ textAlign: "center", fontSize: "0.82rem", color: "rgba(0,200,90,0.55)" }}>
         Green = unexplored roads
       </p>
 
-      <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={onBack} style={{ flex: 1, padding: "13px", borderRadius: 12, border: "1px solid rgba(0,200,90,0.2)", background: "transparent", color: "rgba(0,200,90,0.7)", cursor: "pointer", fontFamily: "Rajdhani, sans-serif", fontWeight: 700, fontSize: "0.9rem", letterSpacing: "0.08em" }}>
+      <div style={{ display: "flex", gap: 12 }}>
+        <button onClick={onBack} style={{ flex: 1, padding: "14px", borderRadius: 12, border: "1px solid rgba(0,200,90,0.25)", background: "transparent", color: "rgba(0,200,90,0.8)", cursor: "pointer", fontFamily: "Rajdhani, sans-serif", fontWeight: 700, fontSize: "1rem", letterSpacing: "0.08em" }}>
           ← TRY ANOTHER
         </button>
-        <button onClick={onReset} style={{ padding: "13px 18px", borderRadius: 12, border: "1px solid rgba(0,200,90,0.2)", background: "transparent", color: "rgba(0,200,90,0.55)", cursor: "pointer", fontSize: "0.85rem", fontFamily: "Inter, sans-serif" }}>
+        <button onClick={onReset} style={{ padding: "14px 22px", borderRadius: 12, border: "1px solid rgba(0,200,90,0.2)", background: "transparent", color: "rgba(0,200,90,0.55)", cursor: "pointer", fontSize: "0.9rem", fontFamily: "Inter, sans-serif" }}>
           Change gamertag
         </button>
       </div>
