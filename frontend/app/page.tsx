@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { XboxProfileResponse, AnalysisResult } from "@/types";
 import type { ScreenshotItem } from "@/app/api/screenshots/route";
 
@@ -225,6 +225,27 @@ export default function Home() {
 }
 
 function RaceTrackBorder({ children }: { children: React.ReactNode }) {
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 600);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  if (isMobile) {
+    return (
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        {children}
+      </div>
+    );
+  }
+
+  return <DesktopRaceTrackBorder>{children}</DesktopRaceTrackBorder>;
+}
+
+function DesktopRaceTrackBorder({ children }: { children: React.ReactNode }) {
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
