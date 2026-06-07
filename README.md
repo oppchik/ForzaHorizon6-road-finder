@@ -127,9 +127,3 @@ forza-road-finder/
 └── docs/
     └── CONTRIBUTING.md
 ```
-
-## Contributing
-
-PRs welcome! See [CONTRIBUTING.md](./docs/CONTRIBUTING.md).
-
-If you find an unexplored road that isn't highlighted — open an issue with your map screenshot (region + zoom level). Different biomes (snow, city, autumn, beac, etc) may need tolerance tuning.
