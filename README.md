@@ -1,14 +1,16 @@
-# 🏎️ Forza Road Finder
+# Forza Horizon 6 Road Finder
 
-> Open-source tool for Forza Horizon 6 Xbox players to find unexplored roads on the map in seconds.
+![Demo](docs/Demo_forza_project.gif)
 
-**Live:** https://forza-horizon6-road-finder.vercel.app
+> 🏎️ Open-source tool for Forza Horizon 6 Xbox players to find unexplored roads on the map in seconds.
+
+**Link:** https://forza-horizon6-road-finder.vercel.app
 
 ---
 
 ## The Problem
 
-Getting 100% road exploration in Forza Horizon 6 requires driving every road on the map (500+). When you're at 99.8%, those last unexplored roads are tiny grey pixels nearly invisible on a TV screen. PC players have scripts for this — **Xbox players had nothing, until now.**
+Getting 100% road exploration in Forza Horizon 6 requires driving every road on the map (671). When you're at 99.8%, those last unexplored roads are tiny grey pixels nearly invisible on a TV screen. PC players have scripts for this — **Xbox players had nothing, until now.**
 
 ## How It Works
 
@@ -19,15 +21,9 @@ Getting 100% road exploration in Forza Horizon 6 requires driving every road on 
 5. Every unexplored road lights up in bright green
 6. Pick up your controller and drive there
 
-**Total time: ~10 seconds**
+**Total time: ~10-15 seconds**
 
----
-
-## Screenshots
-
-| Home | Profile | Result |
-|------|---------|--------|
-| Enter gamertag, animated race track border | Avatar + last 3 Xbox screenshots | Map with unexplored roads highlighted green |
+![Preview](docs/result.png)
 
 ---
 
@@ -109,59 +105,6 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-## Environment Variables
-
-```env
-# frontend/.env.local
-
-# Xbox Live API — get free key at https://xbl.io
-OPENXBL_API_KEY=your_key_here
-
-# CV service URL
-CV_SERVICE_URL=http://localhost:8000
-
-# Shared secret between Next.js and CV service
-# Generate: openssl rand -hex 32
-INTERNAL_SERVICE_SECRET=your_secret_here
-
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-ALLOWED_ORIGINS=http://localhost:3000
-```
-
-```env
-# cv-service (Railway environment variables)
-INTERNAL_SERVICE_SECRET=same_secret_as_above
-ALLOWED_CV_ORIGINS=https://your-app.vercel.app
-```
-
----
-
-## Deployment
-
-### Frontend → Vercel
-
-1. Import repo at [vercel.com](https://vercel.com)
-2. Set **Root Directory** to `frontend`
-3. Add all environment variables from `.env.example`
-4. Deploy
-
-### CV Service → Railway
-
-1. Create project at [railway.app](https://railway.app)
-2. Deploy from GitHub, set **Root Directory** to `cv-service`
-3. Railway auto-detects `Dockerfile`
-4. Add `INTERNAL_SERVICE_SECRET` and `ALLOWED_CV_ORIGINS` variables
-5. Settings → Networking → Generate Domain (port `8000`)
-6. Set **Watch Paths** to `cv-service/**`
-
-### Keep-alive (free Railway plan)
-
-Railway sleeps idle containers. Set up a free monitor at [uptimerobot.com](https://uptimerobot.com):
-- URL: `https://your-cv-service.up.railway.app/health`
-- Interval: 5 minutes
-
----
-
 ## Project Structure
 
 ```
@@ -185,10 +128,8 @@ forza-road-finder/
     └── CONTRIBUTING.md
 ```
 
----
-
 ## Contributing
 
 PRs welcome! See [CONTRIBUTING.md](./docs/CONTRIBUTING.md).
 
-If you find an unexplored road that isn't highlighted — open an issue with your map screenshot (region + zoom level). Different biomes (snow, city, autumn) may need tolerance tuning.
+If you find an unexplored road that isn't highlighted — open an issue with your map screenshot (region + zoom level). Different biomes (snow, city, autumn, beac, etc) may need tolerance tuning.
