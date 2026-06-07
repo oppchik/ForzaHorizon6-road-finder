@@ -116,7 +116,7 @@ export default function Home() {
       <main style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 52px)", padding: "32px 16px" }}>
 
         {step === "input" && (
-          <div className="anim-0" style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
+          <div className="anim-0" style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", alignItems: "center", gap: 0, boxSizing: "border-box" }}>
             <RaceTrackBorder>
               <div style={{ textAlign: "center", marginBottom: 40 }}>
                 <h1 className="font-display" style={{ fontSize: "3rem", fontWeight: 700, color: "#fff", lineHeight: 1.1, marginBottom: 10 }}>
@@ -226,63 +226,32 @@ export default function Home() {
 
 function RaceTrackBorder({ children }: { children: React.ReactNode }) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
 
-    const W = 480, H = 380, R = 18;
-    const perim = 2 * (W - 2*R) + 2 * (H - 2*R) + 2 * Math.PI * R;
-    const TRAIL = perim * 0.18;
-    const SPEED = perim / 220;
-
-    let pos = 0;
     let raf: number;
-
-    const trail = svg.querySelector<SVGPathElement>("#trail")!;
-    const car   = svg.querySelector<SVGCircleElement>("#car")!;
-
-    function pointAt(t: number): [number, number] {
-      t = ((t % perim) + perim) % perim;
-      const top    = W - 2*R;
-      const right  = H - 2*R;
-      const bottom = W - 2*R;
-      const left   = H - 2*R;
-      if (t < top)    return [W - R - t, R];
-      t -= top;
-      if (t < right)  return [R + (R - R * Math.cos(Math.PI/2 * (t/R < 1 ? t/R : 1))), R + (t < R ? R * Math.sin(Math.PI/2 * t/R) : t)];
-
-      const segments = [
-        { len: top,    fn: (s: number): [number,number] => [W - R - s, R] },
-        { len: Math.PI/2*R, fn: (s: number): [number,number] => [R + R*Math.cos(Math.PI/2 + Math.PI/2*(s/(Math.PI/2*R))), R - R*Math.sin(Math.PI/2 + Math.PI/2*(s/(Math.PI/2*R)))] },
-        { len: right,  fn: (s: number): [number,number] => [R, R + s] },
-        { len: Math.PI/2*R, fn: (s: number): [number,number] => [R - R*Math.cos(Math.PI/2*(s/(Math.PI/2*R))), H - R + R*Math.sin(Math.PI - Math.PI/2*(s/(Math.PI/2*R)))] },
-        { len: bottom, fn: (s: number): [number,number] => [R + s, H - R] },
-        { len: Math.PI/2*R, fn: (s: number): [number,number] => [W - R + R*Math.sin(Math.PI/2*(s/(Math.PI/2*R))), H - R + R*Math.cos(Math.PI/2*(s/(Math.PI/2*R)))] },
-        { len: left,   fn: (s: number): [number,number] => [W - R, H - R - s] },
-        { len: Math.PI/2*R, fn: (s: number): [number,number] => [W - R + R*Math.cos(Math.PI - Math.PI/2*(s/(Math.PI/2*R))), R + R*Math.sin(Math.PI - Math.PI/2*(s/(Math.PI/2*R)))] },
-      ];
-
-      let acc = 0;
-      for (const seg of segments) {
-        if (t < acc + seg.len) return seg.fn(t - acc);
-        acc += seg.len;
-      }
-      return [W - R, R];
-    }
-
-    const pathEl = svg.querySelector<SVGPathElement>("#track-path")!;
-    const totalLen = pathEl.getTotalLength();
+    let pos = 0;
 
     function tick() {
+      if (!svg) { raf = requestAnimationFrame(tick); return; }
+      const pathEl = svg.querySelector<SVGPathElement>("#track-path");
+      const trail  = svg.querySelector<SVGPathElement>("#trail");
+      const car    = svg.querySelector<SVGCircleElement>("#car");
+      if (!pathEl || !trail || !car) { raf = requestAnimationFrame(tick); return; }
+
+      const totalLen = pathEl.getTotalLength();
+      const SPEED = totalLen / 220;
+      const trailLen = totalLen * 0.18;
+
       pos = (pos + SPEED) % totalLen;
       const headPt = pathEl.getPointAtLength(pos);
       car.setAttribute("cx", String(headPt.x));
       car.setAttribute("cy", String(headPt.y));
 
-      const trailLen = totalLen * 0.18;
-      const tailPos  = (pos - trailLen + totalLen) % totalLen;
-      const steps    = 60;
+      const steps = 60;
       let d = `M ${headPt.x} ${headPt.y}`;
       for (let i = 1; i <= steps; i++) {
         const p = (pos - (trailLen * i / steps) + totalLen) % totalLen;
@@ -290,7 +259,6 @@ function RaceTrackBorder({ children }: { children: React.ReactNode }) {
         d += ` L ${pt.x} ${pt.y}`;
       }
       trail.setAttribute("d", d);
-
       raf = requestAnimationFrame(tick);
     }
 
@@ -298,22 +266,21 @@ function RaceTrackBorder({ children }: { children: React.ReactNode }) {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const W = 480, H = 380, R = 18;
-  const d = `M ${W-R} ${R} A ${R} ${R} 0 0 0 ${R} ${R} L ${R} ${H-R} A ${R} ${R} 0 0 0 ${W-R} ${H-R} Z`;
+  const W = 480, H = 340, R = 18;
   const rectPath = `M ${W-R},${R} L ${R},${R} A ${R},${R} 0 0 0 0,${R+R} L 0,${H-R} A ${R},${R} 0 0 0 ${R},${H} L ${W-R},${H} A ${R},${R} 0 0 0 ${W},${H-R} L ${W},${R+R} A ${R},${R} 0 0 0 ${W-R},${R} Z`;
 
   return (
-    <div style={{ position: "relative", width: W, height: H }}>
+    <div ref={wrapRef} style={{ position: "relative", width: "100%", maxWidth: W }}>
       <svg
         ref={svgRef}
-        width={W} height={H}
-        style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
         viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}
       >
         <path id="track-path" d={rectPath} fill="none" stroke="transparent" strokeWidth="0" />
-        <path d={rectPath} fill="none" stroke="rgba(0,200,90,0.15)" strokeWidth="1.5" />
-        <path id="trail" d="" fill="none" stroke="url(#trailGrad)" strokeWidth="2.5" strokeLinecap="round" />
-        <circle id="car" cx="0" cy="0" r="4" fill="#00ff55" style={{ filter: "drop-shadow(0 0 6px #00ff55)" }} />
+        <path d={rectPath} fill="none" stroke="rgba(0,200,90,0.15)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+        <path id="trail" d="" fill="none" stroke="url(#trailGrad)" strokeWidth="2.5" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        <circle id="car" cx="0" cy="0" r="5" fill="#00ff55" style={{ filter: "drop-shadow(0 0 6px #00ff55)" }} />
         <defs>
           <linearGradient id="trailGrad" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="#00ff55" stopOpacity="0" />
@@ -321,8 +288,21 @@ function RaceTrackBorder({ children }: { children: React.ReactNode }) {
           </linearGradient>
         </defs>
       </svg>
-      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 48px" }}>
-        {children}
+      <div style={{
+        paddingTop: `${(H/W)*100}%`,
+        position: "relative",
+      }}>
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "32px 28px",
+        }}>
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -346,7 +326,7 @@ function HelpModal({ lang, onLang, onClose }: { lang: "en"|"ru"; onLang: (l: "en
         ["02", "Your last 3 Forza Horizon 6 screenshots appear automatically"],
         ["03", "Tap a map screenshot — analysis starts instantly"],
         ["04", "Unexplored roads are highlighted in green"],
-        ["05", "Use your phone/PC next to your TV to navigate to missing roads"],
+        ["05", "Use your phone next to your TV to navigate to missing roads"],
       ],
       tip: "For best results, take a screenshot of a zoomed-in map in-game without race markers or other activities, and make sure the screenshot is on the XBOX network.",
     },
@@ -357,9 +337,9 @@ function HelpModal({ lang, onLang, onClose }: { lang: "en"|"ru"; onLang: (l: "en
         ["02", "Автоматически появятся ваши последние 3 скриншота FH6"],
         ["03", "Нажмите на скриншот карты — анализ запустится сразу"],
         ["04", "Неисследованные дороги подсветятся зелёным"],
-        ["05", "Смотрите в телефон/ПК рядом с телевизором — едьте к нужным дорогам"],
+        ["05", "Смотрите в телефон рядом с телевизором — едьте к нужным дорогам"],
       ],
-      tip: "Для лучшего результата: сделайте скриншот приближённой карты в игре без маркеров гонок или прочих активностей, а также убедитесь, что скриншот находится в сети XBOX.",
+      tip: "Для лучшего результата: сделайте скриншот приближённой карты в игре без маркеров гонок или прочих активностей и убедитесь, что скриншот находится в сети XBOX.",
     },
   };
   const c = t[lang];
