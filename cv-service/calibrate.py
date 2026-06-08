@@ -1,18 +1,3 @@
-"""
-calibrate.py — Interactive HSV tuner for Forza Horizon map screenshots
-=======================================================================
-Run this locally with a real FH6 screenshot to find the correct HSV
-ranges for unexplored roads before adjusting main.py.
-
-Usage:
-    python calibrate.py <path/to/screenshot.png>
-
-Controls:
-    Trackbars: adjust H/S/V min and max
-    'q':       quit and print the final values to paste into main.py
-    's':       save a debug image showing the current mask
-"""
-
 import sys
 import cv2
 import numpy as np
@@ -35,7 +20,6 @@ def main() -> None:
 
     img_hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
 
-    # Resize for display if needed
     display_h = 600
     scale = display_h / img_bgr.shape[0]
     display_w = int(img_bgr.shape[1] * scale)
@@ -44,7 +28,6 @@ def main() -> None:
     cv2.namedWindow("Calibration", cv2.WINDOW_NORMAL)
     cv2.namedWindow("Mask", cv2.WINDOW_NORMAL)
 
-    # Create trackbars with sensible defaults for "grey unexplored road"
     for name, val, max_val in [
         ("H_min", 0,   179),
         ("H_max", 30,  179),
@@ -72,7 +55,6 @@ def main() -> None:
         mask = cv2.inRange(img_hsv, lower, upper)
         mask_display = cv2.resize(mask, (display_w, display_h))
 
-        # Overlay mask on original
         overlay = img_display.copy()
         overlay[cv2.resize(mask, (display_w, display_h)) > 0] = [0, 0, 255]
 
