@@ -1,8 +1,3 @@
-"""
-Tests for the CV microservice.
-Run with:  pytest tests/ -v
-"""
-
 import io
 import os
 import numpy as np
@@ -10,19 +5,13 @@ import cv2
 import pytest
 from fastapi.testclient import TestClient
 
-# Set a test secret before importing the app
 os.environ["INTERNAL_SERVICE_SECRET"] = "test-secret"
 
-from main import app, find_unexplored_roads  # noqa: E402
+from main import app, find_unexplored_roads  
 
 client = TestClient(app)
 
 SECRET_HEADER = {"X-Internal-Secret": "test-secret"}
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def make_png_bytes(img_bgr: np.ndarray) -> bytes:
     """Encode an OpenCV image to PNG bytes."""
@@ -36,25 +25,18 @@ def solid_image(h: int, w: int, bgr: tuple) -> np.ndarray:
     img[:] = bgr
     return img
 
-
-# ---------------------------------------------------------------------------
-# Unit tests: CV pipeline
-# ---------------------------------------------------------------------------
-
 class TestFindUnexploredRoads:
     def test_no_unexplored_on_blank_dark_image(self):
-        img = solid_image(1080, 1920, (20, 20, 20))  # very dark → outside grey range
+        img = solid_image(1080, 1920, (20, 20, 20)) 
         segs = find_unexplored_roads(img)
         assert segs == []
 
     def test_detects_grey_blob(self):
         """A medium-grey rectangle should be detected as unexplored."""
         img = solid_image(1080, 1920, (20, 20, 20))
-        # Draw a grey road-like rectangle in the middle
         cv2.rectangle(img, (800, 400), (900, 420), (130, 120, 125), -1)
         segs = find_unexplored_roads(img)
         assert len(segs) >= 1
-        # Centre should be roughly in the middle of the image
         assert 0.3 < segs[0].centerX < 0.7
         assert 0.2 < segs[0].centerY < 0.6
 
@@ -79,13 +61,7 @@ class TestFindUnexploredRoads:
         """An entirely grey image should be treated as background noise, not a road."""
         img = solid_image(1080, 1920, (130, 120, 125))
         segs = find_unexplored_roads(img)
-        # The MAX_CONTOUR_AREA_FRACTION filter should remove it
         assert len(segs) == 0
-
-
-# ---------------------------------------------------------------------------
-# Integration tests: HTTP endpoints
-# ---------------------------------------------------------------------------
 
 class TestHealthEndpoint:
     def test_health_ok(self):
@@ -127,7 +103,6 @@ class TestAnalyzeEndpoint:
         assert body["totalUnexplored"] >= 1
 
     def test_rejects_oversized_file(self):
-        # Create a file that is definitely > 10 MB
         big_data = b"x" * (11 * 1024 * 1024)
         res = client.post(
             "/analyze",
