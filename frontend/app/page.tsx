@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { XboxProfileResponse, AnalysisResult } from "@/types";
 import type { ScreenshotItem } from "@/app/api/screenshots/route";
 
@@ -113,17 +113,17 @@ export default function Home() {
 
       {helpOpen && <HelpModal lang={helpLang} onLang={setHelpLang} onClose={() => setHelpOpen(false)} />}
 
-      <main style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 52px)", padding: "32px 16px" }}>
+      <main style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 52px)", padding: "24px 16px", boxSizing: "border-box" }}>
 
         {step === "input" && (
-          <div className="anim-0" style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", alignItems: "center", gap: 0, boxSizing: "border-box" }}>
+          <div className="anim-0" style={{ width: "100%", maxWidth: 440, display: "flex", flexDirection: "column", alignItems: "center" }}>
             <RaceTrackBorder>
-              <div style={{ textAlign: "center", marginBottom: 40 }}>
-                <h1 className="font-display" style={{ fontSize: "3rem", fontWeight: 700, color: "#fff", lineHeight: 1.1, marginBottom: 10 }}>
+              <div style={{ textAlign: "center", marginBottom: 32, marginTop: 12 }}>
+                <h1 className="font-display" style={{ fontSize: "clamp(2rem, 10vw, 3rem)", fontWeight: 700, color: "#fff", lineHeight: 1.1, marginBottom: 10 }}>
                   FORZA ROAD<br />
                   <span style={{ color: "var(--g1)" }}>FINDER</span>
                 </h1>
-                <p style={{ fontSize: "0.75rem", color: "rgba(0,200,90,0.45)", letterSpacing: "0.22em" }}>FORZA HORIZON 6</p>
+                <p style={{ fontSize: "0.72rem", color: "rgba(0,200,90,0.45)", letterSpacing: "0.22em" }}>FORZA HORIZON 6</p>
               </div>
 
               {error && (
@@ -141,7 +141,7 @@ export default function Home() {
                     onChange={e => setGamertag(e.target.value)}
                     maxLength={52}
                     required
-                    style={{ width: "100%", background: "transparent", border: "none", outline: "none", padding: "14px 18px", fontSize: "1rem", color: "#fff", fontFamily: "Inter, sans-serif" }}
+                    style={{ width: "100%", background: "transparent", border: "none", outline: "none", padding: "14px 18px", fontSize: "1rem", color: "#fff", fontFamily: "Inter, sans-serif", boxSizing: "border-box" }}
                   />
                 </div>
                 <button type="submit" disabled={loading || !gamertag.trim()} className="btn">
@@ -153,25 +153,25 @@ export default function Home() {
         )}
 
         {step === "profile" && profile?.profile && (
-          <div className="anim-0" style={{ width: "100%", maxWidth: 900, display: "flex", flexDirection: "column", alignItems: "center", gap: 32 }}>
+          <div className="anim-0" style={{ width: "100%", maxWidth: 700, display: "flex", flexDirection: "column", alignItems: "center", gap: 28 }}>
 
-            <div className="anim-1" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginTop: 8 }}>
+            <div className="anim-1" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
               <div className="avatar-frame">
-                <div style={{ width: 130, height: 130, borderRadius: "50%", overflow: "hidden", background: "var(--g3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 48 }}>
+                <div style={{ width: 120, height: 120, borderRadius: "50%", overflow: "hidden", background: "var(--g3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44 }}>
                   {profile.profile.displayPicRaw
                     ? <img src={profile.profile.displayPicRaw} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     : "👤"}
                 </div>
               </div>
-              <p className="font-display" style={{ fontSize: "2.2rem", fontWeight: 700, color: "#fff", marginTop: 6 }}>{profile.profile.gamertag}</p>
-              <p style={{ fontSize: "1.1rem", color: "rgba(0,200,90,0.6)" }}>{profile.profile.gamerscore.toLocaleString()} GS</p>
+              <p className="font-display" style={{ fontSize: "clamp(1.5rem, 6vw, 2.2rem)", fontWeight: 700, color: "#fff", marginTop: 4 }}>{profile.profile.gamertag}</p>
+              <p style={{ fontSize: "1rem", color: "rgba(0,200,90,0.6)" }}>{profile.profile.gamerscore.toLocaleString()} GS</p>
             </div>
 
             <div className="anim-2" style={{ width: "100%" }}>
               {shotsLoading ? (
                 <div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner /></div>
               ) : shots.length > 0 ? (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 18, width: "100%" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, width: "100%" }}>
                   {shots.map(shot => (
                     <button
                       key={shot.id}
@@ -206,7 +206,7 @@ export default function Home() {
               </div>
             )}
 
-            <button onClick={reset} style={{ padding: "10px 28px", borderRadius: 10, border: "1px solid rgba(0,200,90,0.25)", background: "transparent", cursor: "pointer", color: "rgba(0,200,90,0.5)", fontSize: "0.75rem", letterSpacing: "0.15em", fontFamily: "Rajdhani, sans-serif", fontWeight: 600, transition: "border-color .2s, color .2s" }}>
+            <button onClick={reset} style={{ padding: "10px 28px", borderRadius: 10, border: "1px solid rgba(0,200,90,0.25)", background: "transparent", cursor: "pointer", color: "rgba(0,200,90,0.5)", fontSize: "0.75rem", letterSpacing: "0.15em", fontFamily: "Rajdhani, sans-serif", fontWeight: 600 }}>
               ← CHANGE GAMERTAG
             </button>
           </div>
@@ -225,18 +225,37 @@ export default function Home() {
 }
 
 function RaceTrackBorder({ children }: { children: React.ReactNode }) {
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 600);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  if (isMobile) {
+    return (
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        {children}
+      </div>
+    );
+  }
+
+  return <DesktopRaceTrackBorder>{children}</DesktopRaceTrackBorder>;
+}
+
+function DesktopRaceTrackBorder({ children }: { children: React.ReactNode }) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
-
     let raf: number;
     let pos = 0;
 
     function tick() {
-      if (!svg) { raf = requestAnimationFrame(tick); return; }
+      if (!svg) return;
       const pathEl = svg.querySelector<SVGPathElement>("#track-path");
       const trail  = svg.querySelector<SVGPathElement>("#trail");
       const car    = svg.querySelector<SVGCircleElement>("#car");
@@ -266,11 +285,11 @@ function RaceTrackBorder({ children }: { children: React.ReactNode }) {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const W = 480, H = 340, R = 18;
+  const W = 480, H = 320, R = 18;
   const rectPath = `M ${W-R},${R} L ${R},${R} A ${R},${R} 0 0 0 0,${R+R} L 0,${H-R} A ${R},${R} 0 0 0 ${R},${H} L ${W-R},${H} A ${R},${R} 0 0 0 ${W},${H-R} L ${W},${R+R} A ${R},${R} 0 0 0 ${W-R},${R} Z`;
 
   return (
-    <div ref={wrapRef} style={{ position: "relative", width: "100%", maxWidth: W }}>
+    <div style={{ position: "relative", width: "100%" }}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
@@ -278,8 +297,8 @@ function RaceTrackBorder({ children }: { children: React.ReactNode }) {
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}
       >
         <path id="track-path" d={rectPath} fill="none" stroke="transparent" strokeWidth="0" />
-        <path d={rectPath} fill="none" stroke="rgba(0,200,90,0.15)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-        <path id="trail" d="" fill="none" stroke="url(#trailGrad)" strokeWidth="2.5" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        <path d={rectPath} fill="none" stroke="rgba(0,200,90,0.18)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+        <path id="trail" d="" fill="none" stroke="url(#trailGrad)" strokeWidth="3" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         <circle id="car" cx="0" cy="0" r="5" fill="#00ff55" style={{ filter: "drop-shadow(0 0 6px #00ff55)" }} />
         <defs>
           <linearGradient id="trailGrad" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -288,19 +307,8 @@ function RaceTrackBorder({ children }: { children: React.ReactNode }) {
           </linearGradient>
         </defs>
       </svg>
-      <div style={{
-        paddingTop: `${(H/W)*100}%`,
-        position: "relative",
-      }}>
-        <div style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "32px 28px",
-        }}>
+      <div style={{ paddingTop: `${(H/W)*100}%`, position: "relative" }}>
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "36px 24px 28px" }}>
           {children}
         </div>
       </div>
@@ -379,14 +387,14 @@ function ResultView({ result, onBack, onReset }: { result: AnalysisResult; onBac
   return (
     <div className="anim-0" style={{ width: "100%", maxWidth: 960, display: "flex", flexDirection: "column", gap: 18 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span className="font-display" style={{ color: "#fff", fontSize: "1.2rem" }}>
+        <span className="font-display" style={{ color: "#fff", fontSize: "clamp(0.9rem, 4vw, 1.2rem)" }}>
           UNEXPLORED ROADS <span style={{ color: "var(--g1)" }}>HIGHLIGHTED</span>
         </span>
         <span style={{ fontSize: "0.7rem", color: "rgba(0,200,90,0.35)", fontFamily: "monospace" }}>{result.processingTimeMs}ms</span>
       </div>
 
       {result.imageBase64 && (
-        <div style={{ borderRadius: 18, overflow: "hidden", border: "1px solid rgba(0,200,90,0.2)", boxShadow: "0 0 40px rgba(0,200,90,0.08)" }}>
+        <div style={{ borderRadius: 14, overflow: "hidden", border: "1px solid rgba(0,200,90,0.2)", boxShadow: "0 0 40px rgba(0,200,90,0.08)" }}>
           <img
             src={`data:image/jpeg;base64,${result.imageBase64}`}
             alt="Map with highlighted roads"
