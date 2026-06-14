@@ -271,7 +271,15 @@ function RaceTrackBorder({ children }: { children: React.ReactNode }) {
 
   return (
     <div ref={wrapRef} style={{ position: "relative", width: "100%", maxWidth: W }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .track-svg { display: none !important; }
+          .track-container { padding-top: 0 !important; height: auto !important; }
+          .track-content { position: relative !important; padding: 0 !important; }
+        }
+      `}</style>
       <svg
+        className="track-svg"
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
@@ -288,11 +296,11 @@ function RaceTrackBorder({ children }: { children: React.ReactNode }) {
           </linearGradient>
         </defs>
       </svg>
-      <div style={{
+      <div className="track-container" style={{
         paddingTop: `${(H/W)*100}%`,
         position: "relative",
       }}>
-        <div style={{
+        <div className="track-content" style={{
           position: "absolute",
           inset: 0,
           display: "flex",
