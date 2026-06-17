@@ -1,11 +1,11 @@
-# Contributing to Forza Road Finder
+# Contributing to Forza Horizon 6 Road Finder
 
 Thanks for wanting to help! Here's how to get started.
 
 ## Setup
 
 ```bash
-git clone https://github.com/oppchik/forza-road-finder
+git clone https://github.com/oppchik/ForzaHorizon6-road-finder
 cd forza-road-finder
 
 # Frontend
@@ -29,8 +29,7 @@ cd frontend && npm run type-check
 
 ## Calibrating colour ranges
 
-When Forza Horizon 6 ships, the HSV colour ranges for unexplored roads
-will need calibration. See `cv-service/calibrate.py`:
+See `cv-service/calibrate.py`:
 
 ```bash
 cd cv-service
